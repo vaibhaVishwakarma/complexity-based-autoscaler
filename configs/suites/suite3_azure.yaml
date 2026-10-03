@@ -11,6 +11,9 @@ infrastructure:
     cpu: 24.0
     ram: 48.0
     storage: 1000.0
+  iot_to_edge:
+    latency: 5.0
+    bandwidth: 1000.0
   edge_to_cloud:
     latency: 25.0
     bandwidth: 1000.0
@@ -90,12 +93,13 @@ workload:
   streams:
     CameraSource:
       generator: suite3_azure
+      rate_scale_factor: 0.08
 scaling:
   pools:
     CloudRefine:
       min_workers: 0
       initial_workers: 2
-      max_workers: 12
+      max_workers: 18
       startup_delay_s: 1.0
   queue_up_threshold: 8
   queue_down_threshold: 2

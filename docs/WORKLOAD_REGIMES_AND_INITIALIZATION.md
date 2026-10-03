@@ -65,15 +65,18 @@ $$\text{Capacity} = \left\lfloor \text{workers} \cdot \frac{T_e}{T_{\text{proc}}
     - $k = 2$ workers: $32\text{ RPS}$ (fair-weather base load).
     - $k = 4$ workers: $64\text{ RPS}$ (steady-state equilibrium).
     - $k = 10$ workers: $160\text{ RPS}$ (sustains storm peak of $153\text{ RPS}$).
-    - $k = 12$ workers: $192\text{ RPS}$ ($25\%$ peak burst headroom).
+    - $k = 18$ workers: $288\text{ RPS}$ (peak cluster headroom across all 6 physical nodes).
 
-### 2.2 Physical Node Allocation & Density Math
+### 2.2 Physical Node Allocation & Dual Gigabit Network
 - **Cloud Hardware**: 6 Physical Nodes (`Cloud_0` .. `Cloud_5`), each with 24.0 vCPU, 48.0 GB RAM.
 - **Worker Footprint**: Each `CloudRefineWorker` requires 8.0 vCPU, 16.0 GB RAM.
 - **Node Density**: $\min(\lfloor 24/8 \rfloor, \lfloor 48/16 \rfloor) = \mathbf{3\text{ workers per node}}$.
 - **Dynamic Placement Disclosure**:
   $$\text{Nodes Required}(k) = \left\lceil \frac{k}{3} \right\rceil$$
-  At peak capacity ($k = 12$ workers), workers distribute across **4 physical nodes** (`Cloud_0` .. `Cloud_3` with 3 workers each). `Cloud_4` and `Cloud_5` remain reserved as cluster scale-out headroom.
+  At peak capacity ($k = 18$ workers), workers fully populate **all 6 physical nodes** (`Cloud_0` .. `Cloud_5` with 3 workers each), achieving maximum cluster parallelism ($288\text{ RPS}$).
+- **Dual Gigabit Network Topology**:
+  - `iot_to_edge`: Latency = $5.0\text{ ms}$, Bandwidth = $\mathbf{1000.0\text{ Mbps}}$ (eliminates ingress camera buffer bottleneck under high volume).
+  - `edge_to_cloud`: Latency = $25.0\text{ ms}$, Bandwidth = $\mathbf{1000.0\text{ Mbps}}$ (WAN transit link).
 
 ---
 
@@ -81,19 +84,19 @@ $$\text{Capacity} = \left\lfloor \text{workers} \cdot \frac{T_e}{T_{\text{proc}}
 
 | Regime Key | Workload Name | Ingress $\lambda(t)$ | Complexity $p_{\text{fast}}(t)$ | Cloud Demand $\lambda_{\text{cloud}}(t)$ | Cloud Workers (`init / min / max`) | Physical & Scientific Reasoning across Tiers |
 |:---|:---|:---|:---|:---:|:---:|:---|
-| `suite1_flat` | **Steady-State Baseline** | Flat $100\text{ RPS}$ | Fixed $0.50$ | $50\text{ RPS}$ | **4 / 1 / 12** | **Equilibrium start**: Slow-path load is $50\text{ RPS}$. 4 workers ($64\text{ RPS}$ capacity) eliminate warmup transients to measure pure steady-state drift and cost. |
-| `suite1_spike` | **Volume Spike** | Base $60\text{ RPS} \to$ $300\text{ RPS}$ (3s) | Fixed $0.50$ | $30 \to 150\text{ RPS}$ | **2 / 1 / 12** | **Sized for base rate**: 2 workers ($32\text{ RPS}$) sustain base load. Tests burst detection and rapid scale-out to 10 workers ($160\text{ RPS}$) during 5× spike. |
-| `suite1_burst` | **Bursty Two-State MMPP** | Low $40 \leftrightarrow$ High $200\text{ RPS}$ | Fixed $0.50$ | $20 \leftrightarrow 100\text{ RPS}$ | **2 / 1 / 12** | **Sized for low state**: Tests whether the controller absorbs stochastic MMPP bursts without excessive flapping ($|\Delta k|$) or queue starvation. |
-| `suite1_ramp` | **Continuous Volume Ramp** | Linear $20 \to 160\text{ RPS}$ (100s) | Fixed $0.50$ | $10 \to 80\text{ RPS}$ | **1 / 1 / 12** | **Ramp onset tracking**: Starts at 1 worker ($16\text{ RPS}$). Tests continuous derivative tracking without lag-induced queue accumulation up to 5 workers ($80\text{ RPS}$). |
-| `suite1_zero_begin` | **Cold Start (Scale-from-Zero)** | $0\text{ RPS} \to$ ramp to $120\text{ RPS}$ | Fixed $0.50$ | $0 \to 60\text{ RPS}$ | **0 / 0 / 12** | **Strict cold boot**: Strict 0 instances and 0 floor. Verifies zero idle cost and measures activation delay $\tau_{\text{boot}} = 1.0\text{s}$ queue pileup. |
-| `suite1_zero_terminal` | **Scale-to-Zero Reclamation** | $120\text{ RPS} \to 0\text{ RPS} \to$ drain | Fixed $0.50$ | $60 \to 0\text{ RPS}$ | **4 / 0 / 12** | **Idle reclamation**: Starts warm (4 workers). Enforces Graceful Drain Invariant during 15-epoch post-arrival window ($t \in [150, 165]$) down to 0 workers. |
-| `suite2_shock` | **Complexity Shock (Constant Vol)**| Flat $100\text{ RPS}$ | Shock $0.70 \to 0.20$ at 60s | $30 \to 80\text{ RPS}$ | **2 / 1 / 12** | **Isolates complexity channel**: Volume is silent. Edge triage streams $p_{\text{fast}} \downarrow$; tests proactive preemption before cloud backlog forms. |
-| `suite2_recovery` | **Complexity Shock & Recovery** | Flat $100\text{ RPS}$ | $0.20 \to 0.70$ over 60s | $80 \to 30\text{ RPS}$ | **2 / 1 / 12** | **Hysteresis avoidance**: Evaluates safe scale-down back to 2 workers as Edge inference signals recovering model confidence. |
-| `suite2_compound_stress` | **Compounding Stress Surge** | Ramp $60 \to 160\text{ RPS}$ | Ramp $0.70 \to 0.20$ | $18 \to 128\text{ RPS}$ | **2 / 1 / 12** | **Compounding stress**: Both volume and complexity push cloud demand upward ($7.1\times$ surge). Tests peak cluster scale-out. |
-| `suite2_compound_relief` | **Compounding Relief Drain** | Ramp $160 \to 60\text{ RPS}$ | Ramp $0.20 \to 0.70$ | $128 \to 18\text{ RPS}$ | **4 / 1 / 12** | **Compounding relief**: Both volume and complexity drop cloud demand ($86\%$ reduction). Tests rapid worker reclamation. |
-| `suite2_decoupled_opposing` | **Decoupled Ingress vs Cloud** | Ramp $50 \to 150\text{ RPS}$ | Ramp $0.40 \to 0.80$ | **$30\text{ RPS}$ (constant)** | **2 / 1 / 12** | **True opposing test**: Total ingress triples while cloud demand remains flat. Proves conformal controller avoids volume-blind over-scaling. |
-| `suite2_storm` | **Coupled Storm Surge** | Base $60 \to$ Spike $180\text{ RPS}$ | Base $0.65 \to$ Drop $0.15$ | $21 \to 153\text{ RPS}$ | **2 / 1 / 12** | **Worst-case multiplicative surge**: Slow-path demand explodes $7.3\times$. Stresses cluster capacity to 10 workers ($160\text{ RPS}$). |
-| `suite3_azure` | **Rolling Azure Macrobenchmark** | Azure 2019 trace ($2.0\times$) | Diurnal $0.65 \leftrightarrow 0.20$ | Trace-driven | **2 / 0 / 12** | **Production macrobenchmark**: Replays 14-day Azure trace. Setting `min_workers=0` evaluates scale-to-zero during nocturnal invocation lulls. |
+| `suite1_flat` | **Steady-State Baseline** | Flat $100\text{ RPS}$ | Fixed $0.50$ | $50\text{ RPS}$ | **4 / 1 / 18** | **Equilibrium start**: Slow-path load is $50\text{ RPS}$. 4 workers ($64\text{ RPS}$ capacity) eliminate warmup transients to measure pure steady-state drift and cost. |
+| `suite1_spike` | **Volume Spike** | Base $60\text{ RPS} \to$ $300\text{ RPS}$ (3s) | Fixed $0.50$ | $30 \to 150\text{ RPS}$ | **2 / 1 / 18** | **Sized for base rate**: 2 workers ($32\text{ RPS}$) sustain base load. Tests burst detection and rapid scale-out to 10 workers ($160\text{ RPS}$) during 5× spike. |
+| `suite1_burst` | **Bursty Two-State MMPP** | Low $40 \leftrightarrow$ High $200\text{ RPS}$ | Fixed $0.50$ | $20 \leftrightarrow 100\text{ RPS}$ | **2 / 1 / 18** | **Sized for low state**: Tests whether the controller absorbs stochastic MMPP bursts without excessive flapping ($|\Delta k|$) or queue starvation. |
+| `suite1_ramp` | **Continuous Volume Ramp** | Linear $20 \to 160\text{ RPS}$ (100s) | Fixed $0.50$ | $10 \to 80\text{ RPS}$ | **1 / 1 / 18** | **Ramp onset tracking**: Starts at 1 worker ($16\text{ RPS}$). Tests continuous derivative tracking without lag-induced queue accumulation up to 5 workers ($80\text{ RPS}$). |
+| `suite1_zero_begin` | **Cold Start (Scale-from-Zero)** | $0\text{ RPS} \to$ ramp to $120\text{ RPS}$ | Fixed $0.50$ | $0 \to 60\text{ RPS}$ | **0 / 0 / 18** | **Strict cold boot**: Strict 0 instances and 0 floor. Verifies zero idle cost and measures activation delay $\tau_{\text{boot}} = 1.0\text{s}$ queue pileup. |
+| `suite1_zero_terminal` | **Scale-to-Zero Reclamation** | $120\text{ RPS} \to 0\text{ RPS} \to$ drain | Fixed $0.50$ | $60 \to 0\text{ RPS}$ | **4 / 0 / 18** | **Idle reclamation**: Starts warm (4 workers). Enforces Graceful Drain Invariant during 15-epoch post-arrival window ($t \in [150, 165]$) down to 0 workers. |
+| `suite2_shock` | **Complexity Shock (Constant Vol)**| Flat $100\text{ RPS}$ | Shock $0.70 \to 0.20$ at 60s | $30 \to 80\text{ RPS}$ | **2 / 1 / 18** | **Isolates complexity channel**: Volume is silent. Edge triage streams $p_{\text{fast}} \downarrow$; tests proactive preemption before cloud backlog forms. |
+| `suite2_recovery` | **Complexity Shock & Recovery** | Flat $100\text{ RPS}$ | $0.20 \to 0.70$ over 60s | $80 \to 30\text{ RPS}$ | **2 / 1 / 18** | **Hysteresis avoidance**: Evaluates safe scale-down back to 2 workers as Edge inference signals recovering model confidence. |
+| `suite2_compound_stress` | **Compounding Stress Surge** | Ramp $60 \to 160\text{ RPS}$ | Ramp $0.70 \to 0.20$ | $18 \to 128\text{ RPS}$ | **2 / 1 / 18** | **Compounding stress**: Both volume and complexity push cloud demand upward ($7.1\times$ surge). Tests peak cluster scale-out. |
+| `suite2_compound_relief` | **Compounding Relief Drain** | Ramp $160 \to 60\text{ RPS}$ | Ramp $0.20 \to 0.70$ | $128 \to 18\text{ RPS}$ | **4 / 1 / 18** | **Compounding relief**: Both volume and complexity drop cloud demand ($86\%$ reduction). Tests rapid worker reclamation. |
+| `suite2_decoupled_opposing` | **Decoupled Ingress vs Cloud** | Ramp $50 \to 150\text{ RPS}$ | Ramp $0.40 \to 0.80$ | **$30\text{ RPS}$ (constant)** | **2 / 1 / 18** | **True opposing test**: Total ingress triples while cloud demand remains flat. Proves conformal controller avoids volume-blind over-scaling. |
+| `suite2_storm` | **Coupled Storm Surge** | Base $60 \to$ Spike $180\text{ RPS}$ | Base $0.65 \to$ Drop $0.15$ | $21 \to 153\text{ RPS}$ | **2 / 1 / 18** | **Worst-case multiplicative surge**: Slow-path demand explodes $7.3\times$. Stresses cluster capacity to 10 workers ($160\text{ RPS}$). |
+| `suite3_azure` | **Rolling Azure Macrobenchmark** | Azure 2019 trace ($2.0\times$) | Diurnal $0.65 \leftrightarrow 0.20$ | Trace-driven | **2 / 0 / 18** | **Production macrobenchmark**: Replays 14-day Azure trace. Setting `min_workers=0` evaluates scale-to-zero during nocturnal invocation lulls. |
 
 ---
 
