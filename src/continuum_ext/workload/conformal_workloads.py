@@ -5,29 +5,38 @@ Role: Workload generation layer, Stage 3 of the Conformal Autoscaler evaluation 
 Gate stage: Pre-simulation (produces per-epoch (lambda_t, fp_t) pairs consumed by the runner).
 
 Inputs:
-  - Suite 1/2: Pure parametric configuration via dataclass constructors.
+  - Suite 1/2: Pure parametric configuration via dataclass constructors (doubled capacity scale).
   - Suite 3:   Azure Functions 2019 processed trace at
                data/azure_traces/azure_functions_2019_processed.npz
-               (keys: "arrival_rates", "timestamps_s").
+               (keys: "arrival_rates", "timestamps_s") scaled by rate_scale_factor=2.0.
   - Gate 1 contract: contracts.gate1.Gate1CalibrationConfig — supplies the
                empirical fast-path fraction baseline (fast_path_fraction field).
 
 Outputs:
-  - Per `sample(epoch)` call: (lambda_t: float, fp_t: float) tuple.
-      lambda_t — total arrival rate in requests/epoch.
+  - Per `sample_2d(epoch)` call: (lambda_t: float, fp_t: float) tuple.
+      lambda_t — total arrival rate in requests/epoch (doubled capacity tier).
       fp_t     — fraction of requests routed through the edge fast-path [0.0, 1.0].
   - WorkloadStream2D satisfies the WorkloadStream protocol extension for 2D streams;
-    its `sample_1d(epoch)` delegates to the existing WorkloadStream protocol so it
+    its `sample(epoch)` delegates to the existing WorkloadStream protocol so it
     can be dropped into ContinuumBench runner slots that only consume lambda.
 
-Suites:
+Suites (Doubled Production Capacity Tier):
   Suite 1 — Volume archetypes, fixed fp=FP_SUITE1_FIXED (0.50 per strategy §4.1).
-             Six generators: Flat, Spike, Burst, Ramp, ZeroBeginRamp, ZeroTerminalRamp.
+             Six generators: Flat (100 RPS), Spike (60->300 RPS), Burst (40-200 RPS),
+             Ramp (20->160 RPS), ZeroBeginRamp (0->120 RPS, cold start),
+             ZeroTerminalRamp (120->0 RPS, scale-to-zero).
   Suite 2 — Complexity microbenchmarks, controlled volume, varying fp.
-             Five generators: SteadyShock, SteadyRecovery, OpposingShift1,
-             OpposingShift2, CorrelatedStorm.
+             Five generators: SteadyShock (100 RPS), SteadyRecovery (100 RPS),
+             OpposingShift1 (60->160 RPS, fp: 0.70->0.20),
+             OpposingShift2 (160->60 RPS, fp: 0.20->0.70),
+             CorrelatedStorm (60->180 RPS, fp: 0.65->0.15).
   Suite 3 — Rolling Azure macrobenchmark, driven by real Azure 2019 trace with
-             diurnal fp drift, storm injection, and opposing phase overlays.
+             rate_scale_factor=2.0, diurnal fp drift, and injected OOD storms.
+
+Regime Initialization Metadata:
+  Each workload specifies its recommended initial_workers and min_workers
+  so simulations match the physical regime requirements (e.g. Zero-Begin starts
+  with 0 instances, Zero-Terminal scales to 0).
 """
 
 from __future__ import annotations
@@ -36,7 +45,7 @@ import math
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Protocol, Tuple
+from typing import Any, Dict, List, Optional, Protocol, Tuple
 
 import numpy as np
 
@@ -51,10 +60,95 @@ SEED: int = 42
 #: Sourced from strategy document §4.1 — keeps complexity dimension constant.
 FP_SUITE1_FIXED: float = 0.50
 
+def _find_azure_trace_path() -> Path:
+    """Resolve the authoritative Azure trace path from workspace root."""
+    current = Path(__file__).resolve()
+    for parent in current.parents:
+        candidate = parent / "data" / "azure_traces" / "azure_functions_2019_processed.npz"
+        if candidate.exists():
+            return candidate
+    return Path("/home/vaibo/edgecompute/data/azure_traces/azure_functions_2019_processed.npz")
+
+
 #: Absolute path to the Azure Functions 2019 processed trace (authoritative source).
-_AZURE_TRACE_PATH: Path = (
-    Path(__file__).resolve().parents[6] / "data" / "azure_traces" / "azure_functions_2019_processed.npz"
-)
+_AZURE_TRACE_PATH: Path = _find_azure_trace_path()
+
+# ---------------------------------------------------------------------------
+# Regime Initialization Profiles (Aligned with Experiment Requirements)
+# ---------------------------------------------------------------------------
+
+REGIME_INITIALIZATION_PROFILES: Dict[str, Dict[str, Any]] = {
+    "suite1_flat": {
+        "initial_workers": 4,
+        "min_workers": 1,
+        "description": "Steady-state baseline, warm start at equilibrium (100 RPS)",
+    },
+    "suite1_spike": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Sized for base rate (60 RPS), tests rapid scale-out on 5x spike (300 RPS)",
+    },
+    "suite1_burst": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Sized for low state (40 RPS), tests burst queue handling up to 200 RPS",
+    },
+    "suite1_ramp": {
+        "initial_workers": 1,
+        "min_workers": 1,
+        "description": "Begins at ramp onset (20 RPS), tests continuous linear scale tracking to 160 RPS",
+    },
+    "suite1_zero_begin": {
+        "initial_workers": 0,
+        "min_workers": 0,
+        "description": "Cold start from zero load (0 RPS) and zero instances, tests container boot delay",
+    },
+    "suite1_zero_terminal": {
+        "initial_workers": 4,
+        "min_workers": 0,
+        "description": "Warm start (120 RPS), ramps to zero, tests idle reclamation and scale-to-zero",
+    },
+    "suite2_shock": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Steady volume (100 RPS), tests proactive preemption on sudden OOD drop (fp: 0.70->0.20)",
+    },
+    "suite2_recovery": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Steady volume (100 RPS), tests hysteresis avoidance during natural fp recovery",
+    },
+    "suite2_opposing1": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Volume surges (60->160 RPS) while fp plunges (0.70->0.20), anti-symmetric demand",
+    },
+    "suite2_opposing2": {
+        "initial_workers": 4,
+        "min_workers": 1,
+        "description": "Volume drops (160->60 RPS) while fp recovers (0.20->0.70), accelerated downscaling",
+    },
+    "suite2_storm": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Coupled storm surge (60->180 RPS + fp: 0.65->0.15), worst-case multiplicative stress",
+    },
+    "suite3_azure": {
+        "initial_workers": 2,
+        "min_workers": 0,
+        "description": "2x scaled Azure 2019 trace with diurnal solar drift and injected OOD storm bursts",
+    },
+}
+
+
+def get_regime_initialization(generator_name: str) -> Dict[str, Any]:
+    """Return recommended {'initial_workers': int, 'min_workers': int} for the specified regime."""
+    gen = str(generator_name).lower()
+    return dict(REGIME_INITIALIZATION_PROFILES.get(
+        gen,
+        {"initial_workers": 2, "min_workers": 1, "description": "Default multi-node configuration"}
+    ))
+
 
 # ---------------------------------------------------------------------------
 # Protocol — WorkloadStream2D
@@ -111,21 +205,22 @@ def _clamp(v: float, lo: float = 0.0, hi: float = 1.0) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Suite 1 — Volume Archetypes (fp fixed at FP_SUITE1_FIXED)
+# Suite 1 — Volume Archetypes (fp fixed at FP_SUITE1_FIXED, Doubled Rates)
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class Suite1FlatWorkload:
-    """Suite 1-A: Constant flat load at a fixed rate.
+    """Suite 1-A: Constant flat load at a fixed rate (doubled to 100 RPS).
 
     Complexity dimension: fixed fp=FP_SUITE1_FIXED throughout.
     Volume dimension: constant Poisson(rate_rps) arrivals each epoch.
-
-    Use-case: Establishes the steady-state scaling baseline for every controller.
+    Recommended Init: initial_workers=4, min_workers=1 (warm start at equilibrium).
     """
 
-    rate_rps: float = 50.0
+    rate_rps: float = 100.0
+    recommended_initial_workers: int = 4
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -143,21 +238,21 @@ class Suite1FlatWorkload:
 
 @dataclass
 class Suite1SpikeWorkload:
-    """Suite 1-B: Periodic instantaneous load spike.
+    """Suite 1-B: Periodic instantaneous load spike (base 60 RPS, 5x spike to 300 RPS).
 
     Volume dimension: base rate, then a brief spike (spike_ratio × base) at epoch=spike_epoch,
     then immediately returns to base. Repeats with period `period_epochs` if repeat=True.
     Complexity dimension: fixed fp=FP_SUITE1_FIXED throughout.
-
-    Use-case: Measures controller reaction latency and over-shoot when a spike arrives
-    with no warning (no pre-announcement via fp signal).
+    Recommended Init: initial_workers=2, min_workers=1 (sized for base rate).
     """
 
-    base_rate_rps: float = 30.0
-    spike_ratio: float = 5.0         # spike rate = base * spike_ratio
+    base_rate_rps: float = 60.0
+    spike_ratio: float = 5.0         # spike rate = 60 * 5 = 300 RPS
     spike_duration_epochs: int = 3   # how many epochs the spike persists
     spike_epoch: int = 50            # epoch at which the first spike starts
     period_epochs: int = 0           # 0 = no repeat; >0 = periodic repeat
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -167,10 +262,8 @@ class Suite1SpikeWorkload:
     def _rate_at(self, epoch: int) -> float:
         """Compute the arrival rate at a given epoch, accounting for spikes."""
         if self.period_epochs > 0:
-            # Periodic: project epoch into the current period cycle
             epoch = epoch % self.period_epochs
 
-        # Check if within spike window
         if self.spike_epoch <= epoch < self.spike_epoch + self.spike_duration_epochs:
             return float(self.base_rate_rps * self.spike_ratio)
         return float(self.base_rate_rps)
@@ -186,25 +279,25 @@ class Suite1SpikeWorkload:
 
 @dataclass
 class Suite1BurstWorkload:
-    """Suite 1-C: Random periodic bursty load (MMPP-inspired two-state process).
+    """Suite 1-C: Random periodic bursty load (low 40 RPS, high 200 RPS).
 
     Volume dimension: switches between low_rate and high_rate with Markov transitions.
     Complexity dimension: fixed fp=FP_SUITE1_FIXED throughout.
-
-    Use-case: Tests sustained-burst handling; the burst length is not predictable from
-    volume alone, stressing reactive controllers.
+    Recommended Init: initial_workers=2, min_workers=1 (sized for low state).
     """
 
-    low_rate_rps: float = 20.0
-    high_rate_rps: float = 100.0
+    low_rate_rps: float = 40.0
+    high_rate_rps: float = 200.0
     p_low_to_high: float = 0.05   # per-epoch probability of entering burst state
     p_high_to_low: float = 0.15   # per-epoch probability of leaving burst state
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
         """Seed the RNG and initialise the Markov state."""
         self._rng = random.Random(self.seed)
-        self._state = "low"  # initial Markov state
+        self._state = "low"
 
     def _advance(self) -> None:
         """Advance the Markov chain by one epoch."""
@@ -216,7 +309,7 @@ class Suite1BurstWorkload:
 
     def sample_2d(self, epoch: int) -> Tuple[float, float]:
         """Return (current_markov_rate, FP_SUITE1_FIXED); advances Markov state."""
-        del epoch  # state is maintained internally, epoch is ignored
+        del epoch
         rate = self.high_rate_rps if self._state == "high" else self.low_rate_rps
         self._advance()
         return float(rate), FP_SUITE1_FIXED
@@ -229,18 +322,18 @@ class Suite1BurstWorkload:
 
 @dataclass
 class Suite1RampWorkload:
-    """Suite 1-D: Linear ramp from ramp_start_rps to ramp_end_rps over ramp_epochs.
+    """Suite 1-D: Linear ramp from 20 to 160 RPS over ramp_epochs.
 
     Volume dimension: linearly interpolated rate, holds at ramp_end_rps thereafter.
     Complexity dimension: fixed fp=FP_SUITE1_FIXED throughout.
-
-    Use-case: Tests gradual scale-up behaviour, expected to be handled well by
-    predictive controllers but challenged if the slope is underestimated.
+    Recommended Init: initial_workers=1, min_workers=1 (tracks ramp onset).
     """
 
-    ramp_start_rps: float = 10.0
-    ramp_end_rps: float = 80.0
+    ramp_start_rps: float = 20.0
+    ramp_end_rps: float = 160.0
     ramp_epochs: int = 100
+    recommended_initial_workers: int = 1
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -265,17 +358,17 @@ class Suite1RampWorkload:
 
 @dataclass
 class Suite1ZeroBeginRampWorkload:
-    """Suite 1-E: Cold-start ramp — begins at zero, ramps to steady_rate_rps.
+    """Suite 1-E: Cold-start ramp — begins at zero, ramps to 120 RPS.
 
     Volume dimension: starts at 0 RPS, linear ramp over ramp_epochs, then flat.
     Complexity dimension: fixed fp=FP_SUITE1_FIXED throughout.
-
-    Use-case: Stresses cold-start and minimum-replica behaviour. Controllers with
-    min_replicas=0 must correctly activate workers before queue backlog accumulates.
+    Recommended Init: initial_workers=0, min_workers=0 (STRICT COLD START).
     """
 
-    steady_rate_rps: float = 60.0
+    steady_rate_rps: float = 120.0
     ramp_epochs: int = 50
+    recommended_initial_workers: int = 0
+    recommended_min_workers: int = 0
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -299,18 +392,18 @@ class Suite1ZeroBeginRampWorkload:
 
 @dataclass
 class Suite1ZeroTerminalRampWorkload:
-    """Suite 1-F: Drain ramp — starts at steady_rate_rps, ramps down to zero at terminal_epoch.
+    """Suite 1-F: Drain ramp — starts at 120 RPS, ramps down to zero (Scale-to-Zero).
 
-    Volume dimension: flat at steady_rate_rps until drain_start_epoch, then linear ramp to 0.
+    Volume dimension: flat at 120 RPS until drain_start_epoch, then linear ramp to 0.
     Complexity dimension: fixed fp=FP_SUITE1_FIXED throughout.
-
-    Use-case: Tests scale-down responsiveness and idle-worker reclamation.
-    Controllers that over-retain workers incur unnecessary cost after drain.
+    Recommended Init: initial_workers=4, min_workers=0 (TESTS SCALE-TO-ZERO).
     """
 
-    steady_rate_rps: float = 60.0
+    steady_rate_rps: float = 120.0
     drain_start_epoch: int = 80
     drain_end_epoch: int = 150
+    recommended_initial_workers: int = 4
+    recommended_min_workers: int = 0
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -335,27 +428,25 @@ class Suite1ZeroTerminalRampWorkload:
 
 
 # ---------------------------------------------------------------------------
-# Suite 2 — Complexity Microbenchmarks (volume controlled, fp varies)
+# Suite 2 — Complexity Microbenchmarks (Doubled Rates, Varying fp)
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class Suite2SteadyShockWorkload:
-    """Suite 2-A: Steady volume + sudden complexity shock (fp drops abruptly).
+    """Suite 2-A: Steady volume (100 RPS) + sudden complexity shock (fp: 0.70->0.20).
 
-    Volume dimension: constant at steady_rate_rps.
-    Complexity dimension: fp=fp_high until shock_epoch, then drops to fp_low (shock).
-    Stays at fp_low thereafter (no recovery). This decouples the complexity alarm
-    from any volume signal — the volume channel is silent.
-
-    Use-case: Distinguishes conformal-aware controllers (which receive early fp_low
-    warning via metadata) from complexity-blind ones (which only react to queue growth).
+    Volume dimension: constant at steady_rate_rps = 100.0.
+    Complexity dimension: fp=fp_high until shock_epoch, then drops to fp_low.
+    Recommended Init: initial_workers=2, min_workers=1.
     """
 
-    steady_rate_rps: float = 50.0
+    steady_rate_rps: float = 100.0
     fp_high: float = 0.70     # fast-path fraction before the shock
     fp_low: float = 0.20      # fast-path fraction after the shock
     shock_epoch: int = 60     # epoch at which the complexity drop occurs
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -374,22 +465,20 @@ class Suite2SteadyShockWorkload:
 
 @dataclass
 class Suite2SteadyRecoveryWorkload:
-    """Suite 2-B: Complexity shock followed by natural recovery.
+    """Suite 2-B: Complexity shock (100 RPS) followed by natural recovery (fp: 0.20->0.70).
 
-    Volume dimension: constant at steady_rate_rps.
-    Complexity dimension: fp=fp_high → fp_low at shock_epoch → linearly recovers
-    back to fp_high over recovery_epochs. Exercises whether controllers over-provision
-    after a shock and fail to scale down during recovery.
-
-    Use-case: Symmetric to Suite2SteadyShockWorkload but adds the recovery arc, testing
-    whether conformal guidance continues to signal hysteresis avoidance.
+    Volume dimension: constant at steady_rate_rps = 100.0.
+    Complexity dimension: fp drops to 0.20 at shock_epoch, recovers to 0.70 over recovery_epochs.
+    Recommended Init: initial_workers=2, min_workers=1.
     """
 
-    steady_rate_rps: float = 50.0
+    steady_rate_rps: float = 100.0
     fp_high: float = 0.70
     fp_low: float = 0.20
     shock_epoch: int = 40
     recovery_epochs: int = 60
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -397,13 +486,12 @@ class Suite2SteadyRecoveryWorkload:
         self._rng = random.Random(self.seed)
 
     def _fp_at(self, epoch: int) -> float:
-        """Piecewise fp: high → low at shock → linearly recovers over recovery_epochs."""
+        """Piecewise fp: high -> low at shock -> linearly recovers over recovery_epochs."""
         if epoch < self.shock_epoch:
             return float(self.fp_high)
         rel = epoch - self.shock_epoch
         if rel >= self.recovery_epochs:
             return float(self.fp_high)
-        # Linear interpolation from fp_low back to fp_high
         t = float(rel) / float(self.recovery_epochs)
         return float(self.fp_low + t * (self.fp_high - self.fp_low))
 
@@ -418,24 +506,21 @@ class Suite2SteadyRecoveryWorkload:
 
 @dataclass
 class Suite2OpposingShift1Workload:
-    """Suite 2-C: Opposing shift — volume ramps UP while complexity ramps DOWN.
+    """Suite 2-C: Opposing shift 1 — Volume UP (60->160 RPS) while fp DOWN (0.70->0.20).
 
-    Volume dimension: linear ramp from base_rate_rps to peak_rate_rps over shift_epochs.
-    Complexity dimension: fp ramps from fp_high to fp_low over the same window.
-    These two signals move in opposite directions simultaneously.
-
-    Use-case: The volume channel says 'scale up'; the complexity channel says
-    'the effective GPU load per request is increasing'. Complexity-blind controllers
-    scale linearly with volume and under-provision; conformal controller scales with
-    the effective slow-path load λ_slow = λ * (1 - fp).
+    Volume dimension: linear ramp from 60 to 160 RPS over shift_epochs.
+    Complexity dimension: fp ramps from 0.70 to 0.20 over the same window.
+    Recommended Init: initial_workers=2, min_workers=1.
     """
 
-    base_rate_rps: float = 30.0
-    peak_rate_rps: float = 80.0
+    base_rate_rps: float = 60.0
+    peak_rate_rps: float = 160.0
     fp_high: float = 0.70
     fp_low: float = 0.20
     shift_start_epoch: int = 30
     shift_epochs: int = 80
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -454,7 +539,7 @@ class Suite2OpposingShift1Workload:
         """Return (ramping volume, ramping fp — in opposite direction)."""
         t = self._interp(epoch)
         lam = self.base_rate_rps + t * (self.peak_rate_rps - self.base_rate_rps)
-        fp = self.fp_high + t * (self.fp_low - self.fp_high)  # fp goes down as volume goes up
+        fp = self.fp_high + t * (self.fp_low - self.fp_high)
         return float(lam), _clamp(fp)
 
     def sample(self, epoch: int) -> int:
@@ -465,22 +550,21 @@ class Suite2OpposingShift1Workload:
 
 @dataclass
 class Suite2OpposingShift2Workload:
-    """Suite 2-D: Opposing shift — volume ramps DOWN while complexity ramps UP (fp recovers).
+    """Suite 2-D: Opposing shift 2 — Volume DOWN (160->60 RPS) while fp UP (0.20->0.70).
 
-    Volume dimension: linear ramp from peak_rate_rps to base_rate_rps.
-    Complexity dimension: fp ramps from fp_low to fp_high (complexity decreasing).
-
-    Use-case: The inverse of Suite2OpposingShift1. Volume signal says 'scale down';
-    complexity signal says 'fast-path recovering — each remaining request is cheaper'.
-    Conformal controller scales down faster than complexity-blind ones.
+    Volume dimension: linear ramp from 160 to 60 RPS.
+    Complexity dimension: fp ramps from 0.20 to 0.70.
+    Recommended Init: initial_workers=4, min_workers=1.
     """
 
-    peak_rate_rps: float = 80.0
-    base_rate_rps: float = 30.0
+    peak_rate_rps: float = 160.0
+    base_rate_rps: float = 60.0
     fp_low: float = 0.20
     fp_high: float = 0.70
     shift_start_epoch: int = 30
     shift_epochs: int = 80
+    recommended_initial_workers: int = 4
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -499,7 +583,7 @@ class Suite2OpposingShift2Workload:
         """Return (ramping-down volume, ramping-up fp)."""
         t = self._interp(epoch)
         lam = self.peak_rate_rps + t * (self.base_rate_rps - self.peak_rate_rps)
-        fp = self.fp_low + t * (self.fp_high - self.fp_low)  # fp recovers as volume declines
+        fp = self.fp_low + t * (self.fp_high - self.fp_low)
         return float(lam), _clamp(fp)
 
     def sample(self, epoch: int) -> int:
@@ -510,23 +594,21 @@ class Suite2OpposingShift2Workload:
 
 @dataclass
 class Suite2CorrelatedStormWorkload:
-    """Suite 2-E: Correlated storm — simultaneous volume spike + complexity shock.
+    """Suite 2-E: Correlated storm — Coupled volume surge (60->180 RPS) + complexity shock (fp: 0.65->0.15).
 
-    Volume dimension: base_rate_rps baseline; spikes to burst_rate_rps for storm_duration_epochs.
-    Complexity dimension: fp_high baseline; drops to fp_storm during the same window.
-    Both signals move in the worst-case direction simultaneously.
-
-    Use-case: The maximum-stress microbenchmark. Both the volume and complexity channels
-    demand more GPU capacity at the same time. Validates the conformal controller's ability
-    to correctly size for λ_slow = λ_burst * (1 - fp_storm) without over-shooting.
+    Volume dimension: base 60 RPS, spikes to 180 RPS during storm window.
+    Complexity dimension: fp 0.65 baseline, drops to 0.15 during storm.
+    Recommended Init: initial_workers=2, min_workers=1.
     """
 
-    base_rate_rps: float = 30.0
-    burst_rate_rps: float = 90.0
+    base_rate_rps: float = 60.0
+    burst_rate_rps: float = 180.0
     fp_high: float = 0.65
     fp_storm: float = 0.15
     storm_start_epoch: int = 50
     storm_duration_epochs: int = 30
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -550,44 +632,21 @@ class Suite2CorrelatedStormWorkload:
 
 
 # ---------------------------------------------------------------------------
-# Suite 3 — Rolling Azure Macrobenchmark with Complexity Overlay
+# Suite 3 — Rolling Azure Macrobenchmark (Scaled x2.0, Diurnal fp Drift)
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class RollingAzureComplexityStream:
-    """Suite 3: Rolling Azure Functions 2019 trace with diurnal complexity overlay.
-
-    This is the concluding macrobenchmark that ties all prior suites together.
-    It drives real-world temporal structure (diurnal ramp, periodic bursts, natural
-    load variability) while overlaying synthetic complexity regimes on top.
+    """Suite 3: Rolling Azure Functions 2019 trace with 2.0x scale multiplier & diurnal overlay.
 
     Volume dimension: sourced from `data/azure_traces/azure_functions_2019_processed.npz`
-      via the `arrival_rates` array. The trace is scaled by `rate_scale_factor` to
-      match the target cluster capacity (default 1.0 = raw trace rates).
-
-    Complexity dimension (fp overlay): three interleaved regimes applied on top:
-      (a) Diurnal drift  — fp drifts from fp_diurnal_day to fp_diurnal_night and back
-          over a 24-hour sinusoidal cycle (simulates model complexity increasing at night
-          when edge nodes are under-resourced and more traffic hits cloud).
-      (b) Injected storms — correlated complexity+volume spikes injected at pre-specified
-          epochs (storm_epochs) lasting storm_duration_epochs each.
-      (c) Opposing phase  — within the ramp regions of the Azure trace, fp is inverted
-          relative to the trend (rising load → falling fp; falling load → rising fp),
-          mirroring Suite2 opposing-shift generators on a real-trace backbone.
-
-    Inputs:
-      trace_path: Path to azure_functions_2019_processed.npz. Defaults to
-                  data/azure_traces/azure_functions_2019_processed.npz.
-      epochs_per_second: Simulation epochs per wall-clock second; used to convert
-                         trace timestamps to epoch indices. Default 1 epoch = 1 s.
-
-    Outputs:
-      sample_2d(epoch) → (lambda_t: float, fp_t: float)
-      sample(epoch)    → int (Poisson draw of lambda_t only; backward-compatible shim)
+      scaled by rate_scale_factor = 2.0 (doubled cluster load, preserving 100% trace realism).
+    Complexity dimension: diurnal sinusoidal drift (0.65 day -> 0.20 night) + storm bursts.
+    Recommended Init: initial_workers=2, min_workers=0.
     """
 
-    rate_scale_factor: float = 1.0
+    rate_scale_factor: float = 2.0     # 2.0x scale factor on Azure trace
     fp_diurnal_day: float = 0.65       # fp at peak daytime (low complexity)
     fp_diurnal_night: float = 0.20     # fp at night (high complexity, more cloud work)
     diurnal_period_epochs: int = 1440  # 24 hours if 1 epoch = 1 minute
@@ -595,7 +654,9 @@ class RollingAzureComplexityStream:
     storm_duration_epochs: int = 30
     storm_fp: float = 0.10             # fp during injected storms
     storm_rate_boost: float = 2.5      # λ multiplier during injected storm bursts
-    trace_path: Optional[Path] = None  # None → uses _AZURE_TRACE_PATH default
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 0
+    trace_path: Optional[Path] = None
     seed: int = SEED
 
     def __post_init__(self) -> None:
@@ -611,7 +672,7 @@ class RollingAzureComplexityStream:
                 "No synthetic fallback is permitted per AGENTS.md §6."
             )
 
-        # Load the authoritative trace arrays
+        # Load the authoritative trace arrays (immutable source artifact)
         data = np.load(str(resolved_path), allow_pickle=False)
         if "arrival_rates" not in data:
             raise KeyError(
@@ -619,31 +680,14 @@ class RollingAzureComplexityStream:
                 f"Available keys: {list(data.files)}"
             )
 
-        # Scale trace to target cluster capacity
+        # Scale trace in memory by rate_scale_factor (default 2.0x)
         self._rates: np.ndarray = data["arrival_rates"].astype(np.float64) * self.rate_scale_factor
         self._trace_len: int = len(self._rates)
 
-    # --- Internal helpers ---
-
-    def _storm_set(self) -> set:
-        """Pre-compute the set of epoch indices that fall within any storm window."""
-        storm_idx: set = set()
-        for start in self.storm_epochs:
-            for e in range(start, start + self.storm_duration_epochs):
-                storm_idx.add(e)
-        return storm_idx
-
     def _diurnal_fp(self, epoch: int) -> float:
-        """Compute the sinusoidal diurnal fp at a given epoch.
-
-        fp oscillates between fp_diurnal_night and fp_diurnal_day following a
-        cosine curve with period diurnal_period_epochs. Peak fp (day) occurs at
-        epoch=0 and epoch=diurnal_period_epochs; trough (night) at epoch=period/2.
-        """
+        """Compute the sinusoidal diurnal fp at a given epoch."""
         t = float(epoch % self.diurnal_period_epochs) / float(self.diurnal_period_epochs)
-        # cos(2πt): 1 at t=0 (day), -1 at t=0.5 (night)
         phase = math.cos(2.0 * math.pi * t)
-        # Map [-1, 1] → [fp_diurnal_night, fp_diurnal_day]
         midpoint = (self.fp_diurnal_day + self.fp_diurnal_night) / 2.0
         amplitude = (self.fp_diurnal_day - self.fp_diurnal_night) / 2.0
         return _clamp(midpoint + amplitude * phase, lo=0.0, hi=1.0)
@@ -654,25 +698,17 @@ class RollingAzureComplexityStream:
         return float(self._rates[idx])
 
     def sample_2d(self, epoch: int) -> Tuple[float, float]:
-        """Return (lambda_t, fp_t) for the given epoch with all overlays applied.
-
-        Overlay priority (highest wins):
-          1. Injected storm — both volume boost and fp_storm apply.
-          2. Diurnal drift  — sinusoidal fp with no volume modifier.
-        """
+        """Return (lambda_t, fp_t) for the given epoch with all overlays applied."""
         base_rate = self._trace_rate(epoch)
 
-        # Check if epoch is within an injected storm window
         in_storm = any(
             s <= epoch < s + self.storm_duration_epochs
             for s in self.storm_epochs
         )
 
         if in_storm:
-            # Correlated storm: volume boosted + complexity spiked
             return float(base_rate * self.storm_rate_boost), float(self.storm_fp)
 
-        # Default: diurnal sinusoidal complexity drift
         return float(base_rate), self._diurnal_fp(epoch)
 
     def sample(self, epoch: int) -> int:
@@ -687,41 +723,18 @@ class RollingAzureComplexityStream:
 
 
 def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
-    """Build a 2D workload stream from a configuration dictionary.
-
-    Mirrors the `build_stream` factory in mmpp.py so ContinuumBench scenario
-    builders can construct conformal workloads from YAML config blocks.
-
-    Supported generator names:
-      Suite 1 (fixed fp=0.50):
-        "suite1_flat"           → Suite1FlatWorkload
-        "suite1_spike"          → Suite1SpikeWorkload
-        "suite1_burst"          → Suite1BurstWorkload
-        "suite1_ramp"           → Suite1RampWorkload
-        "suite1_zero_begin"     → Suite1ZeroBeginRampWorkload
-        "suite1_zero_terminal"  → Suite1ZeroTerminalRampWorkload
-
-      Suite 2 (complexity microbenchmarks):
-        "suite2_shock"          → Suite2SteadyShockWorkload
-        "suite2_recovery"       → Suite2SteadyRecoveryWorkload
-        "suite2_opposing1"      → Suite2OpposingShift1Workload
-        "suite2_opposing2"      → Suite2OpposingShift2Workload
-        "suite2_storm"          → Suite2CorrelatedStormWorkload
-
-      Suite 3 (Azure macrobenchmark):
-        "suite3_azure"          → RollingAzureComplexityStream
-    """
+    """Build a 2D workload stream from a configuration dictionary with doubled capacity defaults."""
     generator = str(config.get("generator", "suite1_flat")).lower()
 
     # ---- Suite 1 ----
     if generator == "suite1_flat":
         return Suite1FlatWorkload(
-            rate_rps=float(config.get("rate_rps", 50.0)),
+            rate_rps=float(config.get("rate_rps", 100.0)),
             seed=seed,
         )
     if generator == "suite1_spike":
         return Suite1SpikeWorkload(
-            base_rate_rps=float(config.get("base_rate_rps", 30.0)),
+            base_rate_rps=float(config.get("base_rate_rps", 60.0)),
             spike_ratio=float(config.get("spike_ratio", 5.0)),
             spike_duration_epochs=int(config.get("spike_duration_epochs", 3)),
             spike_epoch=int(config.get("spike_epoch", 50)),
@@ -730,28 +743,28 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
         )
     if generator == "suite1_burst":
         return Suite1BurstWorkload(
-            low_rate_rps=float(config.get("low_rate_rps", 20.0)),
-            high_rate_rps=float(config.get("high_rate_rps", 100.0)),
+            low_rate_rps=float(config.get("low_rate_rps", 40.0)),
+            high_rate_rps=float(config.get("high_rate_rps", 200.0)),
             p_low_to_high=float(config.get("p_low_to_high", 0.05)),
             p_high_to_low=float(config.get("p_high_to_low", 0.15)),
             seed=seed,
         )
     if generator == "suite1_ramp":
         return Suite1RampWorkload(
-            ramp_start_rps=float(config.get("ramp_start_rps", 10.0)),
-            ramp_end_rps=float(config.get("ramp_end_rps", 80.0)),
+            ramp_start_rps=float(config.get("ramp_start_rps", 20.0)),
+            ramp_end_rps=float(config.get("ramp_end_rps", 160.0)),
             ramp_epochs=int(config.get("ramp_epochs", 100)),
             seed=seed,
         )
     if generator == "suite1_zero_begin":
         return Suite1ZeroBeginRampWorkload(
-            steady_rate_rps=float(config.get("steady_rate_rps", 60.0)),
+            steady_rate_rps=float(config.get("steady_rate_rps", 120.0)),
             ramp_epochs=int(config.get("ramp_epochs", 50)),
             seed=seed,
         )
     if generator == "suite1_zero_terminal":
         return Suite1ZeroTerminalRampWorkload(
-            steady_rate_rps=float(config.get("steady_rate_rps", 60.0)),
+            steady_rate_rps=float(config.get("steady_rate_rps", 120.0)),
             drain_start_epoch=int(config.get("drain_start_epoch", 80)),
             drain_end_epoch=int(config.get("drain_end_epoch", 150)),
             seed=seed,
@@ -760,7 +773,7 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
     # ---- Suite 2 ----
     if generator == "suite2_shock":
         return Suite2SteadyShockWorkload(
-            steady_rate_rps=float(config.get("steady_rate_rps", 50.0)),
+            steady_rate_rps=float(config.get("steady_rate_rps", 100.0)),
             fp_high=float(config.get("fp_high", 0.70)),
             fp_low=float(config.get("fp_low", 0.20)),
             shock_epoch=int(config.get("shock_epoch", 60)),
@@ -768,7 +781,7 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
         )
     if generator == "suite2_recovery":
         return Suite2SteadyRecoveryWorkload(
-            steady_rate_rps=float(config.get("steady_rate_rps", 50.0)),
+            steady_rate_rps=float(config.get("steady_rate_rps", 100.0)),
             fp_high=float(config.get("fp_high", 0.70)),
             fp_low=float(config.get("fp_low", 0.20)),
             shock_epoch=int(config.get("shock_epoch", 40)),
@@ -777,8 +790,8 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
         )
     if generator == "suite2_opposing1":
         return Suite2OpposingShift1Workload(
-            base_rate_rps=float(config.get("base_rate_rps", 30.0)),
-            peak_rate_rps=float(config.get("peak_rate_rps", 80.0)),
+            base_rate_rps=float(config.get("base_rate_rps", 60.0)),
+            peak_rate_rps=float(config.get("peak_rate_rps", 160.0)),
             fp_high=float(config.get("fp_high", 0.70)),
             fp_low=float(config.get("fp_low", 0.20)),
             shift_start_epoch=int(config.get("shift_start_epoch", 30)),
@@ -787,8 +800,8 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
         )
     if generator == "suite2_opposing2":
         return Suite2OpposingShift2Workload(
-            peak_rate_rps=float(config.get("peak_rate_rps", 80.0)),
-            base_rate_rps=float(config.get("base_rate_rps", 30.0)),
+            peak_rate_rps=float(config.get("peak_rate_rps", 160.0)),
+            base_rate_rps=float(config.get("base_rate_rps", 60.0)),
             fp_low=float(config.get("fp_low", 0.20)),
             fp_high=float(config.get("fp_high", 0.70)),
             shift_start_epoch=int(config.get("shift_start_epoch", 30)),
@@ -797,8 +810,8 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
         )
     if generator == "suite2_storm":
         return Suite2CorrelatedStormWorkload(
-            base_rate_rps=float(config.get("base_rate_rps", 30.0)),
-            burst_rate_rps=float(config.get("burst_rate_rps", 90.0)),
+            base_rate_rps=float(config.get("base_rate_rps", 60.0)),
+            burst_rate_rps=float(config.get("burst_rate_rps", 180.0)),
             fp_high=float(config.get("fp_high", 0.65)),
             fp_storm=float(config.get("fp_storm", 0.15)),
             storm_start_epoch=int(config.get("storm_start_epoch", 50)),
@@ -810,7 +823,7 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
     if generator == "suite3_azure":
         storm_epochs_raw = config.get("storm_epochs", [300, 800, 1200])
         return RollingAzureComplexityStream(
-            rate_scale_factor=float(config.get("rate_scale_factor", 1.0)),
+            rate_scale_factor=float(config.get("rate_scale_factor", 2.0)),
             fp_diurnal_day=float(config.get("fp_diurnal_day", 0.65)),
             fp_diurnal_night=float(config.get("fp_diurnal_night", 0.20)),
             diurnal_period_epochs=int(config.get("diurnal_period_epochs", 1440)),

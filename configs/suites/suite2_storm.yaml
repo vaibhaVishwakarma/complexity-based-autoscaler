@@ -1,0 +1,101 @@
+scenario: split_inference
+realism_tier: T0
+step_seconds: 1.0
+infrastructure:
+  infrastructure_id: multinode_continuum_infra
+  n_space: 0
+  n_iot: 4
+  n_edge: 8
+  n_cloud: 6
+  cloud:
+    cpu: 24.0
+    ram: 48.0
+    storage: 1000.0
+  edge_to_cloud:
+    latency: 25.0
+    bandwidth: 1000.0
+stages:
+  CameraSource:
+    priority_prob_high: 0.5
+    output_size_bytes: 200000
+    processing_time_s: 0.0
+    resources:
+      placement_layers:
+      - iot
+  EdgePreprocess:
+    processing_time_s: 0.1
+    resources:
+      placement_layers:
+      - edge
+  EdgeInference:
+    processing_time_s: 0.15
+    triage_high_priorities:
+    - critical
+    - high
+    resources:
+      placement_layers:
+      - edge
+  CloudRefineWorker:
+    processing_time_s: 0.35
+    resources:
+      placement_layers:
+      - cloud
+  Sink:
+    deadline_s: 15.0
+    resources:
+      placement_layers:
+      - edge
+autoscaling:
+  hpa:
+    target_utilization: 0.7
+    tolerance: 0.1
+    min_replicas: 0
+    cooldown_epochs: 2
+  keda:
+    queue_target_per_worker: 6
+    activation_queue_length: 2
+    min_replicas: 0
+    cooldown_epochs: 2
+  inferline:
+    alpha_fast: 0.6
+    alpha_mid: 0.2
+    alpha_slow: 0.05
+    stabilise_epochs: 10
+    safety_margin: 1.15
+    min_replicas: 0
+    cooldown_epochs: 2
+  complexity_blind:
+    alpha: 0.3
+    assumed_fp: 0.5
+    safety_margin: 1.2
+    min_replicas: 0
+    cooldown_epochs: 2
+  conformal:
+    fp_preempt_threshold: 0.35
+    fp_recovery_threshold: 0.45
+    set_size_recovery_max: 1.8
+    alpha_lambda: 0.35
+    safety_margin: 1.2
+    min_replicas: 0
+    cooldown_epochs: 2
+placement:
+  strategy: best_fit
+  place_every_epochs: 2
+scenario_config:
+  application_id: SplitInference_suite2_storm
+epochs: 80
+drain_epochs: 15
+workload:
+  streams:
+    CameraSource:
+      generator: suite2_storm
+scaling:
+  pools:
+    CloudRefine:
+      min_workers: 1
+      initial_workers: 2
+      max_workers: 12
+      startup_delay_s: 1.0
+  queue_up_threshold: 8
+  queue_down_threshold: 2
+  cooldown_epochs: 2
