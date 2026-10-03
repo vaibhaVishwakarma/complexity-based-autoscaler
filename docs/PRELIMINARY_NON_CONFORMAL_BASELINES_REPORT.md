@@ -4,6 +4,7 @@
 **Scope**: Evaluates all 5 non-conformal autoscaling policies on a scaled-out multi-node continuum infrastructure.  
 **Authoritative Sources**:
 - Benchmark Config: [`configs/preliminary_multinode_split_inference.yaml`](file:///home/vaibo/edgecompute/configs/preliminary_multinode_split_inference.yaml)
+- Regime Initialization Guide: [`docs/WORKLOAD_REGIMES_AND_INITIALIZATION.md`](file:///home/vaibo/edgecompute/docs/WORKLOAD_REGIMES_AND_INITIALIZATION.md)
 - Master Strategy: [`docs/CONFORMAL_AUTOSCALER_STRATEGY.md`](file:///home/vaibo/edgecompute/docs/CONFORMAL_AUTOSCALER_STRATEGY.md)
 - Contracts: [`contracts/gate1.py`](file:///home/vaibo/edgecompute/contracts/gate1.py) & [`contracts/gate2.py`](file:///home/vaibo/edgecompute/contracts/gate2.py)
 - Run Artifacts: `output/preliminary_runs/`
@@ -224,7 +225,7 @@ The preliminary run was executed across **75 total epochs** (60 arrival epochs +
 | **P99 Latency (s)** | 57.26 | 57.00 | 58.00 | 57.26 | 57.27 |
 | **Mean Queue Wait Time (s)** | 24.00 | 24.06 | 24.32 | 24.04 | 24.06 |
 | **P95 Queue Wait Time (s)** | 51.00 | 51.00 | 52.00 | 51.00 | 51.00 |
-| **Total Scaling Delta ($|\Delta k|$)** | 10.0 | **117.0** | 20.0 | **12.0** | 8.0 |
+| **Total Scaling Delta ($\Delta k$)** | 10.0 | **117.0** | 20.0 | **12.0** | 8.0 |
 | **Deadline Misses (SLO > 15s)** | 331 | 332 | 330 | 331 | 330 |
 
 *(Source: `output/preliminary_runs/preliminary_baselines_comparison.csv`)*
