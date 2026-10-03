@@ -1,0 +1,108 @@
+# preliminary_multinode_split_inference.yaml
+# Large-scale multi-node continuum configuration for preliminary baseline evaluation.
+# Infrastructure: 4 IoT nodes, 8 Edge nodes, 6 Cloud GPU nodes.
+# Pool: CloudRefine worker pool (1 to 12 workers).
+# Evaluation: 60 workload epochs + 15 drain epochs (75 total).
+
+scenario: split_inference
+realism_tier: T0
+epochs: 60
+drain_epochs: 15
+step_seconds: 1.0
+
+scenario_config:
+  application_id: SplitInferenceMultiNode
+
+infrastructure:
+  infrastructure_id: multinode_continuum_infra
+  n_space: 0
+  n_iot: 4
+  n_edge: 8
+  n_cloud: 6
+  cloud:
+    cpu: 24.0
+    ram: 48.0
+    storage: 1000.0
+  edge_to_cloud:
+    latency: 25.0
+    bandwidth: 1000.0
+
+workload:
+  streams:
+    CameraSource:
+      generator: piecewise
+      segments:
+        - epochs: 10
+          rate: 12.0
+        - epochs: 15
+          rate: 48.0
+        - epochs: 15
+          rate: 20.0
+        - epochs: 20
+          rate: 55.0
+
+stages:
+  CameraSource:
+    priority_prob_high: 0.50
+    output_size_bytes: 200000
+    processing_time_s: 0.0
+    resources:
+      placement_layers: ["iot"]
+  EdgePreprocess:
+    processing_time_s: 0.10
+    resources:
+      placement_layers: ["edge"]
+  EdgeInference:
+    processing_time_s: 0.15
+    triage_high_priorities: ["critical", "high"]
+    resources:
+      placement_layers: ["edge"]
+  CloudRefineWorker:
+    processing_time_s: 0.35
+    resources:
+      placement_layers: ["cloud"]
+  Sink:
+    deadline_s: 15.0
+    resources:
+      placement_layers: ["edge"]
+
+scaling:
+  pools:
+    CloudRefine:
+      min_workers: 1
+      initial_workers: 2
+      max_workers: 12
+      startup_delay_s: 1.0
+  queue_up_threshold: 8
+  queue_down_threshold: 2
+  cooldown_epochs: 2
+
+autoscaling:
+  hpa:
+    target_utilization: 0.70
+    tolerance: 0.10
+    min_replicas: 1
+    cooldown_epochs: 2
+  keda:
+    queue_target_per_worker: 6
+    activation_queue_length: 2
+    min_replicas: 1
+    cooldown_epochs: 2
+  inferline:
+    alpha_fast: 0.60
+    alpha_mid: 0.20
+    alpha_slow: 0.05
+    stabilise_epochs: 10
+    safety_margin: 1.15
+    min_replicas: 1
+    cooldown_epochs: 2
+  complexity_blind:
+    alpha: 0.30
+    assumed_fp: 0.50
+    safety_margin: 1.20
+    min_replicas: 1
+    cooldown_epochs: 2
+
+placement:
+  strategy: best_fit
+  place_every_epochs: 2

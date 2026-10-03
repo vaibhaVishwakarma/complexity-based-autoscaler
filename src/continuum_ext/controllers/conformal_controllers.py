@@ -386,19 +386,21 @@ class ComplexityBlindPredictiveController(_PlacementReplanMixin):
             self._cooldowns[stage] = max(0, self._cooldowns.get(stage, 0) - 1)
 
             observed_queue = float(state.queue_depths.get(stage, 0))
-            prev_ema = self._ema.get(stage, observed_queue)
+            ingress_lambda = float(state.metadata.get("ingress_lambda", 0.0))
+            if ingress_lambda <= 0.0:
+                ingress_lambda = observed_queue * (self._capacity_rps / max(1, snapshot.active_workers))
 
-            # EMA forecast of queue depth
-            ema = self.alpha * observed_queue + (1.0 - self.alpha) * prev_ema
+            prev_ema = self._ema.get(stage, ingress_lambda)
+
+            # EMA forecast of ingress volume λ(t)
+            ema = self.alpha * ingress_lambda + (1.0 - self.alpha) * prev_ema
             self._ema[stage] = ema
 
-            # Convert queue-depth forecast to estimated arrival RPS
-            # (assumes 1 queue item represents 1 unserviced RPS unit at current capacity)
-            lambda_forecast = ema * (self._capacity_rps / max(1, snapshot.active_workers))
-
             # Complexity-blind: assume fp is always assumed_fp (never from metadata)
-            # λ_slow = λ * (1 - fp)  ← fp is frozen at assumed_fp
-            lambda_slow = lambda_forecast * (1.0 - self.assumed_fp)
+            # λ_slow = λ * (1 - fp_assumed) + Q / Δt_drain
+            drainage_budget_s = 0.50
+            queue_drain_rate = observed_queue / drainage_budget_s
+            lambda_slow = ema * (1.0 - self.assumed_fp) + queue_drain_rate
 
             desired_workers = math.ceil(
                 lambda_slow * self.safety_margin / max(1e-9, self._capacity_rps)
@@ -409,7 +411,7 @@ class ComplexityBlindPredictiveController(_PlacementReplanMixin):
             forecast_metrics[stage] = {
                 "observed_queue": float(observed_queue),
                 "ema_queue": float(ema),
-                "lambda_forecast_rps": float(lambda_forecast),
+                "lambda_forecast_rps": float(ema),
                 "assumed_fp": float(self.assumed_fp),
                 "lambda_slow_rps": float(lambda_slow),
                 "desired_workers": int(desired_workers),
@@ -603,11 +605,16 @@ class ConformalAutoscalerController(_PlacementReplanMixin):
             current_workers = int(snapshot.active_workers)
             observed_queue = float(state.queue_depths.get(stage, 0))
 
-            # --- Compute λ_slow (effective GPU demand) ---
-            # λ_slow = (queue rate estimate) × (1 − fp) measures actual slow-path load
-            capacity_denominator = max(1, current_workers)
-            lambda_hat = observed_queue * (self._capacity_rps / float(capacity_denominator))
-            lambda_slow_t = lambda_hat * (1.0 - fp_t)
+            # --- Compute λ_slow (effective GPU demand per Section 8.1) ---
+            # λ_slow(t) = λ(t) * (1 - fp(t)) + Q(t) / Δt_target
+            ingress_lambda = float(state.metadata.get("ingress_lambda", 0.0))
+            if ingress_lambda <= 0.0:
+                capacity_denominator = max(1, current_workers)
+                ingress_lambda = observed_queue * (self._capacity_rps / float(capacity_denominator))
+
+            drainage_budget_s = 0.50
+            queue_drain_rate = observed_queue / drainage_budget_s
+            lambda_slow_t = ingress_lambda * (1.0 - fp_t) + queue_drain_rate
 
             # EMA smoothing of λ_slow to reduce noise
             prev_ema = self._ema_lambda_slow.get(stage, lambda_slow_t)
