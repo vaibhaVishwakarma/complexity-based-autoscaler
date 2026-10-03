@@ -1,0 +1,48 @@
+# ── Virtual Environment & Python Artifacts ─────────────────────────────────────
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+.ipynb_checkpoints/
+
+# ── Large Model Weights & Binary Checkpoints (> 100MB) ─────────────────────────
+models/*.onnx
+models/*.onnx.data
+*.pt
+*.bin
+*.tar.gz
+!models/.gitkeep
+
+# ── Datasets & Large Image Splits ──────────────────────────────────────────────
+.cache/
+data/tinyimagenet/val/
+!data/tinyimagenet/.gitkeep
+!data/azure_traces/azure_functions_2019_processed.npz
+
+# ── Experiment Outputs & Runtime Logs ──────────────────────────────────────────
+output/
+runs/
+logs/
+*.log
+
+# ── Cloned Frameworks & External Repositories ───────────────────────────────────
+clones/
+
+# ── Reference Papers & External Evaluation Methodologies ───────────────────────
+references/
+
+# ── OS & IDE Metadata ──────────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

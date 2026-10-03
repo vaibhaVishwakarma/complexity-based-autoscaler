@@ -1,0 +1,259 @@
+{
+  "description": "T_service(b,q) empirical surface matrix. Freshly profiled per Gate 2 Roadmap. Scrutiny fixes A-F applied. q2/q3/q4 share identical execution latency (ResNet-152 constant FLOPs) \u2014 this is disclosed, not hidden.",
+  "hardware": "CPU Execution Target",
+  "warmup_runs": 20,
+  "timed_runs": 100,
+  "batch_sizes": [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32
+  ],
+  "synthetic_tensors": true,
+  "preprocessing_note": "Synthetic N(0,1) tensors used for isolation. Real pipeline overhead: ~3.75ms decode+resize+normalize (CPU), ~2.5ms H2D PCIe transfer (GPU) \u2014 not included in profiling.",
+  "gpu_profiles_raw": [
+    {
+      "batch_size": 1,
+      "p50_ms": 174.56500650007456,
+      "p95_ms": 176.508620950176,
+      "p99_ms": 177.05644255997186,
+      "mean_ms": 174.6981152300054,
+      "std_ms": 0.9311225875943087,
+      "n_runs": 100,
+      "batch_formation_wait_ms_mean": 0.0,
+      "batch_formation_wait_ms_p95": 0.0,
+      "jitter_cv": 0.05,
+      "jitter_sigma_ms": 8.728250325003728,
+      "e2e_p50_ms": 174.56500650007456
+    },
+    {
+      "batch_size": 2,
+      "p50_ms": 315.010318999839,
+      "p95_ms": 316.98292730004596,
+      "p99_ms": 318.59102468005176,
+      "mean_ms": 315.15059196000266,
+      "std_ms": 1.2255447522206224,
+      "n_runs": 100,
+      "batch_formation_wait_ms_mean": 20.0,
+      "batch_formation_wait_ms_p95": 52.900000000000006,
+      "jitter_cv": 0.05,
+      "jitter_sigma_ms": 15.75051594999195,
+      "e2e_p50_ms": 335.010318999839
+    },
+    {
+      "batch_size": 4,
+      "p50_ms": 598.7913460000982,
+      "p95_ms": 614.0942891998975,
+      "p99_ms": 625.2766065199603,
+      "mean_ms": 601.0125703400172,
+      "std_ms": 7.422967562543903,
+      "n_runs": 100,
+      "batch_formation_wait_ms_mean": 60.0,
+      "batch_formation_wait_ms_p95": 116.98447156901607,
+      "jitter_cv": 0.05,
+      "jitter_sigma_ms": 29.93956730000491,
+      "e2e_p50_ms": 658.7913460000982
+    },
+    {
+      "batch_size": 8,
+      "p50_ms": 1174.464778000015,
+      "p95_ms": 1197.8551602500147,
+      "p99_ms": 1215.3579121900975,
+      "mean_ms": 1176.6306981699881,
+      "std_ms": 13.114856411895316,
+      "n_runs": 100,
+      "batch_formation_wait_ms_mean": 140.0,
+      "batch_formation_wait_ms_p95": 227.04521813402502,
+      "jitter_cv": 0.05,
+      "jitter_sigma_ms": 58.72323890000075,
+      "e2e_p50_ms": 1314.464778000015
+    },
+    {
+      "batch_size": 16,
+      "p50_ms": 2719.181962499988,
+      "p95_ms": 2779.4738224500747,
+      "p99_ms": 2801.759738450014,
+      "mean_ms": 2722.258623779994,
+      "std_ms": 32.4544376261097,
+      "n_runs": 100,
+      "batch_formation_wait_ms_mean": 300.0,
+      "batch_formation_wait_ms_p95": 427.42115209022404,
+      "jitter_cv": 0.05,
+      "jitter_sigma_ms": 135.9590981249994,
+      "e2e_p50_ms": 3019.181962499988
+    },
+    {
+      "batch_size": 32,
+      "p50_ms": 6868.08333550016,
+      "p95_ms": 6924.243112900126,
+      "p99_ms": 6949.2968071099995,
+      "mean_ms": 6865.80971198,
+      "std_ms": 34.25662516877022,
+      "n_runs": 100,
+      "batch_formation_wait_ms_mean": 620.0,
+      "batch_formation_wait_ms_p95": 803.1794475371078,
+      "jitter_cv": 0.05,
+      "jitter_sigma_ms": 343.404166775008,
+      "e2e_p50_ms": 7488.08333550016
+    }
+  ],
+  "service_surface": {
+    "q1": {
+      "bin_label": "|C|=1 (CPU fast-path)",
+      "routing": "CPU fast-path (EfficientNet-B0 ONNX)",
+      "p50_ms": 10.7,
+      "p95_ms": 13.1,
+      "p99_ms": 13.7,
+      "note": "CPU Fast Path: mean=10.7ms std=1.2ms (Gate 1 T=1.0 RAPS measured). No batch-formation wait (singletons routed immediately)."
+    },
+    "q2": {
+      "bin_label": "|C|=2 (low-complexity slow-path)",
+      "routing": "Slow-path (ResNet-152 PyTorch)",
+      "note": "CONSTANT-FLOP DISCLOSURE: ResNet-152 (11.56B FLOPs) has a static computational graph. Latency is a function of batch size b ONLY, not input content. q2/q3/q4 bins share identical execution latency per batch size. The set-size signal is carried by the routing decision (fast vs slow), not by within-path latency variation. Includes batch-formation wait W_batch and 5% CV GPU jitter per USENIX ATC 2022.",
+      "by_batch_size": {
+        "b1": {
+          "p50_ms": 174.56500650007456,
+          "p95_ms": 176.508620950176,
+          "p99_ms": 177.05644255997186,
+          "e2e_p50_ms": 174.56500650007456,
+          "e2e_p95_ms_with_jitter": 190.87
+        },
+        "b2": {
+          "p50_ms": 315.010318999839,
+          "p95_ms": 316.98292730004596,
+          "p99_ms": 318.59102468005176,
+          "e2e_p50_ms": 335.010318999839,
+          "e2e_p95_ms_with_jitter": 395.79
+        },
+        "b4": {
+          "p50_ms": 598.7913460000982,
+          "p95_ms": 614.0942891998975,
+          "p99_ms": 625.2766065199603,
+          "e2e_p50_ms": 658.7913460000982,
+          "e2e_p95_ms_with_jitter": 780.33
+        },
+        "b8": {
+          "p50_ms": 1174.464778000015,
+          "p95_ms": 1197.8551602500147,
+          "p99_ms": 1215.3579121900975,
+          "e2e_p50_ms": 1314.464778000015,
+          "e2e_p95_ms_with_jitter": 1521.5
+        },
+        "b16": {
+          "p50_ms": 2719.181962499988,
+          "p95_ms": 2779.4738224500747,
+          "p99_ms": 2801.759738450014,
+          "e2e_p50_ms": 3019.181962499988,
+          "e2e_p95_ms_with_jitter": 3430.55
+        },
+        "b32": {
+          "p50_ms": 6868.08333550016,
+          "p95_ms": 6924.243112900126,
+          "p99_ms": 6949.2968071099995,
+          "e2e_p50_ms": 7488.08333550016,
+          "e2e_p95_ms_with_jitter": 8292.32
+        }
+      }
+    },
+    "q3": {
+      "bin_label": "|C|=3-5 (medium-complexity slow-path)",
+      "routing": "Slow-path (ResNet-152 PyTorch)",
+      "note": "CONSTANT-FLOP DISCLOSURE: ResNet-152 (11.56B FLOPs) has a static computational graph. Latency is a function of batch size b ONLY, not input content. q2/q3/q4 bins share identical execution latency per batch size. The set-size signal is carried by the routing decision (fast vs slow), not by within-path latency variation. Includes batch-formation wait W_batch and 5% CV GPU jitter per USENIX ATC 2022.",
+      "by_batch_size": {
+        "b1": {
+          "p50_ms": 174.56500650007456,
+          "p95_ms": 176.508620950176,
+          "p99_ms": 177.05644255997186,
+          "e2e_p50_ms": 174.56500650007456,
+          "e2e_p95_ms_with_jitter": 190.87
+        },
+        "b2": {
+          "p50_ms": 315.010318999839,
+          "p95_ms": 316.98292730004596,
+          "p99_ms": 318.59102468005176,
+          "e2e_p50_ms": 335.010318999839,
+          "e2e_p95_ms_with_jitter": 395.79
+        },
+        "b4": {
+          "p50_ms": 598.7913460000982,
+          "p95_ms": 614.0942891998975,
+          "p99_ms": 625.2766065199603,
+          "e2e_p50_ms": 658.7913460000982,
+          "e2e_p95_ms_with_jitter": 780.33
+        },
+        "b8": {
+          "p50_ms": 1174.464778000015,
+          "p95_ms": 1197.8551602500147,
+          "p99_ms": 1215.3579121900975,
+          "e2e_p50_ms": 1314.464778000015,
+          "e2e_p95_ms_with_jitter": 1521.5
+        },
+        "b16": {
+          "p50_ms": 2719.181962499988,
+          "p95_ms": 2779.4738224500747,
+          "p99_ms": 2801.759738450014,
+          "e2e_p50_ms": 3019.181962499988,
+          "e2e_p95_ms_with_jitter": 3430.55
+        },
+        "b32": {
+          "p50_ms": 6868.08333550016,
+          "p95_ms": 6924.243112900126,
+          "p99_ms": 6949.2968071099995,
+          "e2e_p50_ms": 7488.08333550016,
+          "e2e_p95_ms_with_jitter": 8292.32
+        }
+      }
+    },
+    "q4": {
+      "bin_label": "|C|>5 (high-complexity slow-path)",
+      "routing": "Slow-path (ResNet-152 PyTorch)",
+      "note": "CONSTANT-FLOP DISCLOSURE: ResNet-152 (11.56B FLOPs) has a static computational graph. Latency is a function of batch size b ONLY, not input content. q2/q3/q4 bins share identical execution latency per batch size. The set-size signal is carried by the routing decision (fast vs slow), not by within-path latency variation. Includes batch-formation wait W_batch and 5% CV GPU jitter per USENIX ATC 2022.",
+      "by_batch_size": {
+        "b1": {
+          "p50_ms": 174.56500650007456,
+          "p95_ms": 176.508620950176,
+          "p99_ms": 177.05644255997186,
+          "e2e_p50_ms": 174.56500650007456,
+          "e2e_p95_ms_with_jitter": 190.87
+        },
+        "b2": {
+          "p50_ms": 315.010318999839,
+          "p95_ms": 316.98292730004596,
+          "p99_ms": 318.59102468005176,
+          "e2e_p50_ms": 335.010318999839,
+          "e2e_p95_ms_with_jitter": 395.79
+        },
+        "b4": {
+          "p50_ms": 598.7913460000982,
+          "p95_ms": 614.0942891998975,
+          "p99_ms": 625.2766065199603,
+          "e2e_p50_ms": 658.7913460000982,
+          "e2e_p95_ms_with_jitter": 780.33
+        },
+        "b8": {
+          "p50_ms": 1174.464778000015,
+          "p95_ms": 1197.8551602500147,
+          "p99_ms": 1215.3579121900975,
+          "e2e_p50_ms": 1314.464778000015,
+          "e2e_p95_ms_with_jitter": 1521.5
+        },
+        "b16": {
+          "p50_ms": 2719.181962499988,
+          "p95_ms": 2779.4738224500747,
+          "p99_ms": 2801.759738450014,
+          "e2e_p50_ms": 3019.181962499988,
+          "e2e_p95_ms_with_jitter": 3430.55
+        },
+        "b32": {
+          "p50_ms": 6868.08333550016,
+          "p95_ms": 6924.243112900126,
+          "p99_ms": 6949.2968071099995,
+          "e2e_p50_ms": 7488.08333550016,
+          "e2e_p95_ms_with_jitter": 8292.32
+        }
+      }
+    }
+  }
+}

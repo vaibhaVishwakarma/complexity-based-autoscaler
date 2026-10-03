@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "research": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/research/SKILL.md",
+      "computedHash": "c8c1cba327a6f824b554cd978079a3dadd7406d73174f8fb9bfef58824691970"
+    },
+    "skill-creator": {
+      "source": "openclaw/openclaw",
+      "sourceType": "github",
+      "skillPath": "skills/skill-creator/SKILL.md",
+      "computedHash": "5db89f7a46d3f78918e578b291b987a1cbc3a46aa4d20cbc9ada156e7981b4a0"
+    },
+    "skill-scout": {
+      "source": "affaan-m/ECC",
+      "sourceType": "github",
+      "skillPath": "skills/skill-scout/SKILL.md",
+      "computedHash": "de5198258963565835175b4429f9c1ea7ac5c21c5ab0c3cc4646bb1826a83951"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+# Validity Gate 2 Core Requirements
+# Python 3.10+ Environment for CPU / GPU Service Profiling & Spearman Correlation Evaluation
+
+torch>=2.0.0
+torchvision>=0.15.0
+onnxruntime>=1.15.0
+numpy>=1.23.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+Pillow>=9.5.0

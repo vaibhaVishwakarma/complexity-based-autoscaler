@@ -1,0 +1,70 @@
+{
+  "hardware": "Tesla T4",
+  "n_requests": 25000,
+  "fast_path_frac": 0.5,
+  "bin_fracs": {
+    "1": 0.5,
+    "2": 0.05,
+    "3": 0.1,
+    "4": 0.35
+  },
+  "batch_dist": {
+    "1": 0.05,
+    "2": 0.1,
+    "4": 0.25,
+    "8": 0.35,
+    "16": 0.2,
+    "32": 0.05
+  },
+  "jitter_cv": 0.05,
+  "arrival_rate_rps": 50.0,
+  "results_by_queue_utilization": {
+    "0.3": {
+      "queue_utilization_rho": 0.3,
+      "mean_Wq_ms": 27.252,
+      "r_s": 0.8226856730597124,
+      "p_value": 0.0,
+      "t_statistic": 228.8014446103207,
+      "n_samples": 25000,
+      "gate_pass": true,
+      "fast_slow_overlap_frac": 0.0,
+      "fast_path_mean_ms": 10.69404039128874,
+      "slow_path_mean_ms": 249.07985092976733
+    },
+    "0.7": {
+      "queue_utilization_rho": 0.7,
+      "mean_Wq_ms": 148.371,
+      "r_s": 0.8209536960029954,
+      "p_value": 0.0,
+      "t_statistic": 227.32079322803185,
+      "n_samples": 25000,
+      "gate_pass": true,
+      "fast_slow_overlap_frac": 0.0,
+      "fast_path_mean_ms": 10.680221036909085,
+      "slow_path_mean_ms": 368.33745966485316
+    },
+    "0.95": {
+      "queue_utilization_rho": 0.95,
+      "mean_Wq_ms": 1208.164,
+      "r_s": 0.7726966492829604,
+      "p_value": 0.0,
+      "t_statistic": 192.46046468821382,
+      "n_samples": 25000,
+      "gate_pass": true,
+      "fast_slow_overlap_frac": 0.1795675588779037,
+      "fast_path_mean_ms": 129.3488879661907,
+      "slow_path_mean_ms": 1437.4074070420393
+    }
+  },
+  "gate_pass_all_rho": true,
+  "gate_pass_rho_0_7": true,
+  "constant_flop_disclosure": "ResNet-152 has 11.56B FLOPs regardless of input. q2/q3/q4 share identical execution latency per batch size b. Set-size signal is in routing decision only.",
+  "scrutiny_fixes": {
+    "fix_A_queuing": "M/M/1 queue model at rho=[0.3, 0.7, 0.95]",
+    "fix_B_constant_flop": "Disclosed \u2014 q2/q3/q4 identical by design",
+    "fix_C_fp_frac": "Updated 0.3827\u21920.50 (Gate 1 T=1.0 RAPS actual)",
+    "fix_D_batch_wait": "W_batch=(b-1)/lambda*1000ms at lambda=50.0rps",
+    "fix_E_jitter": "Gaussian sigma=5.0% of p50 added to slow-path",
+    "fix_F_monotonicity": "Verified in profile_triton_service.py assert_monotonicity()"
+  }
+}

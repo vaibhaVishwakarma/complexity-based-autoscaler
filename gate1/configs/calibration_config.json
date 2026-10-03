@@ -1,0 +1,33 @@
+{
+  "alpha": 0.1,
+  "q_hat": 0.799140015422964,
+  "score_function": "RAPS (Angelopoulos et al. ICLR 2021)",
+  "k_reg": 5,
+  "lambda_reg": 0.01,
+  "temperature": 1.0,
+  "temperature_constraint": "T >= 1.0 (ECE-minimizing; sharpening T < 1.0 prohibited)",
+  "num_classes": 182,
+  "dataset": "Tiny ImageNet-C (K=182 mapped classes from Tiny ImageNet; NOT full ImageNet-C 1000-class)",
+  "model_type": "EfficientNet-B0 (KD from ResNet-152, T=1.0, RAPS lambda=0.01 k=5)",
+  "num_epochs": 20,
+  "split": "cal=5000 / test=4100",
+  "cal_top1_accuracy": 0.8186,
+  "test_top1_accuracy": 0.8170731707317073,
+  "empirical_coverage": 0.9663414634146341,
+  "fast_path_fraction": 0.5,
+  "err_selective": 0.023414634146341463,
+  "err_selective_note": "Incorrect singletons / total singletons. Independent of FP_frac.",
+  "mean_set_size": 7.25,
+  "gate1_passed": {
+    "empirical_coverage_pass": true,
+    "err_selective_pass": true,
+    "fp_frac_pass": true,
+    "overall": true
+  },
+  "scrutiny_fixes": {
+    "fix1_raps": "True RAPS score: lambda=0.01, k_reg=5",
+    "fix2_temperature": "T=1.0 >= 1.0 enforced (ECE-minimizing)",
+    "fix3_metrics": "Err_selective and FP_frac as independent columns; no composite metric",
+    "fix5_dataset": "Dataset labelled as Tiny ImageNet-C (K=182) throughout"
+  }
+}
