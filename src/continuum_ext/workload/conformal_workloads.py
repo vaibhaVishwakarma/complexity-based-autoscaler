@@ -41,6 +41,7 @@ Regime Initialization Metadata:
 
 from __future__ import annotations
 
+import hashlib
 import math
 import random
 from dataclasses import dataclass, field
@@ -55,6 +56,9 @@ import numpy as np
 
 #: Canonical seed shared across all suites for reproducibility.
 SEED: int = 42
+
+#: Authoritative SHA256 checksum for the Azure Functions 2019 trace (AGENTS.md §6).
+AZURE_TRACE_SHA256: str = "9aeabacb08f01b34f46efc252db76248a55094cdae1f0e86c8eda39fa09b7447"
 
 #: Fixed fast-path fraction for Suite 1 (all volume archetypes).
 #: Sourced from strategy document §4.1 — keeps complexity dimension constant.
@@ -118,15 +122,30 @@ REGIME_INITIALIZATION_PROFILES: Dict[str, Dict[str, Any]] = {
         "min_workers": 1,
         "description": "Steady volume (100 RPS), tests hysteresis avoidance during natural fp recovery",
     },
+    "suite2_compound_stress": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "Volume surges (60->160 RPS) while fp plunges (0.70->0.20), compounding cloud stress (18->128 RPS)",
+    },
+    "suite2_compound_relief": {
+        "initial_workers": 4,
+        "min_workers": 1,
+        "description": "Volume drops (160->60 RPS) while fp recovers (0.20->0.70), compounding cloud relief (128->18 RPS)",
+    },
+    "suite2_decoupled_opposing": {
+        "initial_workers": 2,
+        "min_workers": 1,
+        "description": "True opposing test: Ingress surges 3x (50->150 RPS) while fp rises (0.40->0.80), holding cloud demand constant at 30 RPS",
+    },
     "suite2_opposing1": {
         "initial_workers": 2,
         "min_workers": 1,
-        "description": "Volume surges (60->160 RPS) while fp plunges (0.70->0.20), anti-symmetric demand",
+        "description": "Legacy alias for suite2_compound_stress",
     },
     "suite2_opposing2": {
         "initial_workers": 4,
         "min_workers": 1,
-        "description": "Volume drops (160->60 RPS) while fp recovers (0.20->0.70), accelerated downscaling",
+        "description": "Legacy alias for suite2_compound_relief",
     },
     "suite2_storm": {
         "initial_workers": 2,
@@ -505,11 +524,12 @@ class Suite2SteadyRecoveryWorkload:
 
 
 @dataclass
-class Suite2OpposingShift1Workload:
-    """Suite 2-C: Opposing shift 1 — Volume UP (60->160 RPS) while fp DOWN (0.70->0.20).
+class Suite2CompoundStressWorkload:
+    """Suite 2-C: Compounding stress — Volume UP (60->160 RPS) while fp DOWN (0.70->0.20).
 
     Volume dimension: linear ramp from 60 to 160 RPS over shift_epochs.
     Complexity dimension: fp ramps from 0.70 to 0.20 over the same window.
+    Cloud demand compounds upward: 18 RPS -> 128 RPS (7.1x surge).
     Recommended Init: initial_workers=2, min_workers=1.
     """
 
@@ -536,7 +556,7 @@ class Suite2OpposingShift1Workload:
         return float(epoch - self.shift_start_epoch) / float(self.shift_epochs)
 
     def sample_2d(self, epoch: int) -> Tuple[float, float]:
-        """Return (ramping volume, ramping fp — in opposite direction)."""
+        """Return (ramping volume, ramping fp — compounding cloud stress)."""
         t = self._interp(epoch)
         lam = self.base_rate_rps + t * (self.peak_rate_rps - self.base_rate_rps)
         fp = self.fp_high + t * (self.fp_low - self.fp_high)
@@ -548,12 +568,17 @@ class Suite2OpposingShift1Workload:
         return _poisson(lam, self._rng)
 
 
+#: Backward compatibility alias
+Suite2OpposingShift1Workload = Suite2CompoundStressWorkload
+
+
 @dataclass
-class Suite2OpposingShift2Workload:
-    """Suite 2-D: Opposing shift 2 — Volume DOWN (160->60 RPS) while fp UP (0.20->0.70).
+class Suite2CompoundReliefWorkload:
+    """Suite 2-D: Compounding relief — Volume DOWN (160->60 RPS) while fp UP (0.20->0.70).
 
     Volume dimension: linear ramp from 160 to 60 RPS.
     Complexity dimension: fp ramps from 0.20 to 0.70.
+    Cloud demand compounds downward: 128 RPS -> 18 RPS (86% drop).
     Recommended Init: initial_workers=4, min_workers=1.
     """
 
@@ -580,7 +605,7 @@ class Suite2OpposingShift2Workload:
         return float(epoch - self.shift_start_epoch) / float(self.shift_epochs)
 
     def sample_2d(self, epoch: int) -> Tuple[float, float]:
-        """Return (ramping-down volume, ramping-up fp)."""
+        """Return (ramping-down volume, ramping-up fp — compounding cloud relief)."""
         t = self._interp(epoch)
         lam = self.peak_rate_rps + t * (self.base_rate_rps - self.peak_rate_rps)
         fp = self.fp_low + t * (self.fp_high - self.fp_low)
@@ -588,6 +613,58 @@ class Suite2OpposingShift2Workload:
 
     def sample(self, epoch: int) -> int:
         """1D shim: Poisson draw of the ramping-down rate."""
+        lam, _ = self.sample_2d(epoch)
+        return _poisson(lam, self._rng)
+
+
+#: Backward compatibility alias
+Suite2OpposingShift2Workload = Suite2CompoundReliefWorkload
+
+
+@dataclass
+class Suite2DecoupledOpposingWorkload:
+    """Suite 2-F: Decoupled Opposing — Volume UP (50->150 RPS) while fp UP (0.40->0.80).
+
+    Ingress volume surges 3x, but fast-path ratio rises simultaneously such that
+    cloud slow-path demand remains constant at exactly 30 RPS:
+        lambda_cloud(0) = 50 * (1 - 0.40) = 30.0 RPS
+        lambda_cloud(T) = 150 * (1 - 0.80) = 30.0 RPS
+    Directly tests whether volume-only autoscalers over-provision while the
+    conformal autoscaler holds allocation steady.
+    Recommended Init: initial_workers=2, min_workers=1.
+    """
+
+    start_rate_rps: float = 50.0
+    end_rate_rps: float = 150.0
+    fp_start: float = 0.40
+    fp_end: float = 0.80
+    shift_start_epoch: int = 20
+    shift_epochs: int = 80
+    recommended_initial_workers: int = 2
+    recommended_min_workers: int = 1
+    seed: int = SEED
+
+    def __post_init__(self) -> None:
+        """Seed the internal RNG."""
+        self._rng = random.Random(self.seed)
+
+    def _interp(self, epoch: int) -> float:
+        """Return interpolation factor t in [0, 1] for the shift window."""
+        if epoch < self.shift_start_epoch:
+            return 0.0
+        if epoch >= self.shift_start_epoch + self.shift_epochs:
+            return 1.0
+        return float(epoch - self.shift_start_epoch) / float(self.shift_epochs)
+
+    def sample_2d(self, epoch: int) -> Tuple[float, float]:
+        """Return (ramping volume, ramping fp — maintaining constant 30 RPS cloud demand)."""
+        t = self._interp(epoch)
+        lam = self.start_rate_rps + t * (self.end_rate_rps - self.start_rate_rps)
+        fp = self.fp_start + t * (self.fp_end - self.fp_start)
+        return float(lam), _clamp(fp)
+
+    def sample(self, epoch: int) -> int:
+        """1D shim: Poisson draw of the ramping rate."""
         lam, _ = self.sample_2d(epoch)
         return _poisson(lam, self._rng)
 
@@ -665,11 +742,21 @@ class RollingAzureComplexityStream:
         resolved_path = self.trace_path or _AZURE_TRACE_PATH
 
         # Validate that the trace file exists (Dataset Integrity — AGENTS.md §6)
-        if not Path(resolved_path).exists():
+        p = Path(resolved_path)
+        if not p.exists():
             raise FileNotFoundError(
                 f"Azure trace not found at {resolved_path}. "
                 "Ensure data/azure_traces/azure_functions_2019_processed.npz is present. "
                 "No synthetic fallback is permitted per AGENTS.md §6."
+            )
+
+        # Verify dataset integrity via authoritative SHA256 (AGENTS.md §6)
+        with open(p, "rb") as f:
+            actual_sha = hashlib.sha256(f.read()).hexdigest()
+        if actual_sha != AZURE_TRACE_SHA256:
+            raise ValueError(
+                f"Azure trace checksum mismatch at {resolved_path}. "
+                f"Expected {AZURE_TRACE_SHA256}, got {actual_sha}."
             )
 
         # Load the authoritative trace arrays (immutable source artifact)
@@ -788,8 +875,8 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
             recovery_epochs=int(config.get("recovery_epochs", 60)),
             seed=seed,
         )
-    if generator == "suite2_opposing1":
-        return Suite2OpposingShift1Workload(
+    if generator in ("suite2_compound_stress", "suite2_opposing1"):
+        return Suite2CompoundStressWorkload(
             base_rate_rps=float(config.get("base_rate_rps", 60.0)),
             peak_rate_rps=float(config.get("peak_rate_rps", 160.0)),
             fp_high=float(config.get("fp_high", 0.70)),
@@ -798,13 +885,23 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
             shift_epochs=int(config.get("shift_epochs", 80)),
             seed=seed,
         )
-    if generator == "suite2_opposing2":
-        return Suite2OpposingShift2Workload(
+    if generator in ("suite2_compound_relief", "suite2_opposing2"):
+        return Suite2CompoundReliefWorkload(
             peak_rate_rps=float(config.get("peak_rate_rps", 160.0)),
             base_rate_rps=float(config.get("base_rate_rps", 60.0)),
             fp_low=float(config.get("fp_low", 0.20)),
             fp_high=float(config.get("fp_high", 0.70)),
             shift_start_epoch=int(config.get("shift_start_epoch", 30)),
+            shift_epochs=int(config.get("shift_epochs", 80)),
+            seed=seed,
+        )
+    if generator == "suite2_decoupled_opposing":
+        return Suite2DecoupledOpposingWorkload(
+            start_rate_rps=float(config.get("start_rate_rps", 50.0)),
+            end_rate_rps=float(config.get("end_rate_rps", 150.0)),
+            fp_start=float(config.get("fp_start", 0.40)),
+            fp_end=float(config.get("fp_end", 0.80)),
+            shift_start_epoch=int(config.get("shift_start_epoch", 20)),
             shift_epochs=int(config.get("shift_epochs", 80)),
             seed=seed,
         )

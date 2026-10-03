@@ -23,12 +23,12 @@ stages:
       placement_layers:
       - iot
   EdgePreprocess:
-    processing_time_s: 0.1
+    processing_time_s: 0.002
     resources:
       placement_layers:
       - edge
   EdgeInference:
-    processing_time_s: 0.15
+    processing_time_s: 0.003
     triage_high_priorities:
     - critical
     - high
@@ -36,11 +36,12 @@ stages:
       placement_layers:
       - edge
   CloudRefineWorker:
-    processing_time_s: 0.35
+    processing_time_s: 0.0625
     resources:
       placement_layers:
       - cloud
   Sink:
+    processing_time_s: 0.001
     deadline_s: 15.0
     resources:
       placement_layers:
@@ -98,4 +99,3 @@ scaling:
       startup_delay_s: 1.0
   queue_up_threshold: 8
   queue_down_threshold: 2
-  cooldown_epochs: 2

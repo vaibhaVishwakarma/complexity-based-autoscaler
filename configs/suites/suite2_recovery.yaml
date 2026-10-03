@@ -23,12 +23,12 @@ stages:
       placement_layers:
       - iot
   EdgePreprocess:
-    processing_time_s: 0.1
+    processing_time_s: 0.002
     resources:
       placement_layers:
       - edge
   EdgeInference:
-    processing_time_s: 0.15
+    processing_time_s: 0.003
     triage_high_priorities:
     - critical
     - high
@@ -36,11 +36,12 @@ stages:
       placement_layers:
       - edge
   CloudRefineWorker:
-    processing_time_s: 0.35
+    processing_time_s: 0.0625
     resources:
       placement_layers:
       - cloud
   Sink:
+    processing_time_s: 0.001
     deadline_s: 15.0
     resources:
       placement_layers:
@@ -49,12 +50,12 @@ autoscaling:
   hpa:
     target_utilization: 0.7
     tolerance: 0.1
-    min_replicas: 0
+    min_replicas: 1
     cooldown_epochs: 2
   keda:
     queue_target_per_worker: 6
     activation_queue_length: 2
-    min_replicas: 0
+    min_replicas: 1
     cooldown_epochs: 2
   inferline:
     alpha_fast: 0.6
@@ -62,13 +63,13 @@ autoscaling:
     alpha_slow: 0.05
     stabilise_epochs: 10
     safety_margin: 1.15
-    min_replicas: 0
+    min_replicas: 1
     cooldown_epochs: 2
   complexity_blind:
     alpha: 0.3
     assumed_fp: 0.5
     safety_margin: 1.2
-    min_replicas: 0
+    min_replicas: 1
     cooldown_epochs: 2
   conformal:
     fp_preempt_threshold: 0.35
@@ -76,14 +77,14 @@ autoscaling:
     set_size_recovery_max: 1.8
     alpha_lambda: 0.35
     safety_margin: 1.2
-    min_replicas: 0
+    min_replicas: 1
     cooldown_epochs: 2
 placement:
   strategy: best_fit
   place_every_epochs: 2
 scenario_config:
   application_id: SplitInference_suite2_recovery
-epochs: 100
+epochs: 120
 drain_epochs: 15
 workload:
   streams:
@@ -98,4 +99,3 @@ scaling:
       startup_delay_s: 1.0
   queue_up_threshold: 8
   queue_down_threshold: 2
-  cooldown_epochs: 2

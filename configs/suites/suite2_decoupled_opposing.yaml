@@ -83,13 +83,13 @@ placement:
   strategy: best_fit
   place_every_epochs: 2
 scenario_config:
-  application_id: SplitInference_suite1_spike
-epochs: 80
+  application_id: SplitInference_suite2_decoupled_opposing
+epochs: 120
 drain_epochs: 15
 workload:
   streams:
     CameraSource:
-      generator: suite1_spike
+      generator: suite2_decoupled_opposing
 scaling:
   pools:
     CloudRefine:

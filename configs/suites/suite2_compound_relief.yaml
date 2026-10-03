@@ -83,18 +83,18 @@ placement:
   strategy: best_fit
   place_every_epochs: 2
 scenario_config:
-  application_id: SplitInference_suite1_spike
-epochs: 80
+  application_id: SplitInference_suite2_compound_relief
+epochs: 120
 drain_epochs: 15
 workload:
   streams:
     CameraSource:
-      generator: suite1_spike
+      generator: suite2_compound_relief
 scaling:
   pools:
     CloudRefine:
       min_workers: 1
-      initial_workers: 2
+      initial_workers: 4
       max_workers: 12
       startup_delay_s: 1.0
   queue_up_threshold: 8
