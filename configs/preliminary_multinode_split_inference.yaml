@@ -49,19 +49,20 @@ stages:
     resources:
       placement_layers: ["iot"]
   EdgePreprocess:
-    processing_time_s: 0.10
+    processing_time_s: 0.002
     resources:
       placement_layers: ["edge"]
   EdgeInference:
-    processing_time_s: 0.15
+    processing_time_s: 0.003
     triage_high_priorities: ["critical", "high"]
     resources:
       placement_layers: ["edge"]
   CloudRefineWorker:
-    processing_time_s: 0.35
+    processing_time_s: 0.0625
     resources:
       placement_layers: ["cloud"]
   Sink:
+    processing_time_s: 0.001
     deadline_s: 15.0
     resources:
       placement_layers: ["edge"]
