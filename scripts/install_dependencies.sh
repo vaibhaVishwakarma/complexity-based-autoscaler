@@ -34,7 +34,8 @@ cd "${WORKSPACE_ROOT}"
 # ── 1. Virtual Environment Setup ─────────────────────────────────────────────
 if [ ! -d ".venv" ]; then
     echo "[1/6] Creating Python 3 virtual environment in .venv..."
-    python3 -m venv .venv
+    pip install virtualenv
+    virtualenv .venv --python=python3.12
 else
     echo "[1/6] Using existing virtual environment in .venv."
 fi
