@@ -55,7 +55,7 @@ logger = logging.getLogger("key_rotator")
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_FILE = WORKSPACE_ROOT / ".env"
 DEFAULT_BACKUP_FILE = WORKSPACE_ROOT / ".env.backup"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
 API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 
