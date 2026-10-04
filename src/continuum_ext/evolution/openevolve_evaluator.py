@@ -520,6 +520,41 @@ def _compute_map_elites_features(agg: dict, fitness_j: float) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _log_performance_check(
+    stage: str,
+    program_path: str,
+    result: EvaluationResult,
+    details: dict = None,
+) -> EvaluationResult:
+    """
+    Appends an authoritative record of this evaluation performance check to
+    output/evolution_runs/evaluator_checks.jsonl. Returns the EvaluationResult
+    unmodified for convenient chaining.
+    """
+    try:
+        import json
+        import time
+        from datetime import datetime, timezone
+
+        check_file = EVOLUTION_OUTPUT_DIR / "evaluator_checks.jsonl"
+        check_file.parent.mkdir(parents=True, exist_ok=True)
+
+        record = {
+            "timestamp": time.time(),
+            "datetime": datetime.now(timezone.utc).isoformat(),
+            "stage": stage,
+            "program_path": str(program_path),
+            "metrics": result.metrics,
+            "artifacts": {k: str(v)[:500] for k, v in result.artifacts.items()} if result.artifacts else {},
+            "details": details or {},
+        }
+        with open(check_file, "a") as f:
+            f.write(json.dumps(record) + "\n")
+    except Exception:
+        pass
+    return result
+
+
 def evaluate_stage1(program_path: str) -> EvaluationResult:
     """
     Stage 1: Pure Validity Gate (~0.05s).
@@ -540,48 +575,48 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
         with open(program_path, "r") as f:
             code_str = f.read()
     except Exception as e:
-        return EvaluationResult(
+        return _log_performance_check("stage1", program_path, EvaluationResult(
             metrics={"stage1_passed": 0.0, "combined_score": 0.0},
             artifacts={"error_message": f"Cannot read program file: {e}"},
-        )
+        ), details={"error": str(e)})
 
     # ── Step 1a: Static AST Validation ───────────────────────────────────────
     ast_errors = validate_ast(code_str)
     if ast_errors:
-        return EvaluationResult(
+        return _log_performance_check("stage1", program_path, EvaluationResult(
             metrics={"stage1_passed": 0.0, "combined_score": 0.0},
             artifacts={
                 "error_message": "AST validation failed. Fix the following errors:\n" + "\n".join(ast_errors),
                 "failure_stage": "stage1_ast",
             },
-        )
+        ), details={"ast_errors": ast_errors})
 
     # ── Step 1b: Dynamic Import & Boundary Runtime Test ──────────────────────
     policy_fn, load_error = _load_candidate_policy(program_path)
     if policy_fn is None:
-        return EvaluationResult(
+        return _log_performance_check("stage1", program_path, EvaluationResult(
             metrics={"stage1_passed": 0.0, "combined_score": 0.0},
             artifacts={
                 "error_message": f"Failed to load compute_target_workers: {load_error}",
                 "failure_stage": "stage1_import",
             },
-        )
+        ), details={"load_error": str(load_error)})
 
     passed, boundary_errors = _run_boundary_tests(policy_fn)
     if not passed:
-        return EvaluationResult(
+        return _log_performance_check("stage1", program_path, EvaluationResult(
             metrics={"stage1_passed": 0.0, "combined_score": 0.0},
             artifacts={
                 "error_message": "Boundary state tests failed:\n" + boundary_errors,
                 "failure_stage": "stage1_boundary",
             },
-        )
+        ), details={"boundary_errors": boundary_errors})
 
     # ── Stage 1 Passed ────────────────────────────────────────────────────────
-    return EvaluationResult(
+    return _log_performance_check("stage1", program_path, EvaluationResult(
         metrics={"stage1_passed": 1.0, "combined_score": 1.0},
         artifacts={"stage1_status": "PASSED: AST valid, boundary tests passed"},
-    )
+    ), details={"status": "PASSED"})
 
 
 def evaluate_stage2(program_path: str) -> EvaluationResult:
@@ -619,13 +654,13 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
 
     # ── If all simulations failed (CLI error / controller crash), reject ───────
     if not results:
-        return EvaluationResult(
+        return _log_performance_check("stage2", program_path, EvaluationResult(
             metrics={"stage2_passed": 0.0, "combined_score": -9999.0},
             artifacts={
                 "error_message": "All Stage 2 simulations failed to produce output.",
                 "failure_stage": "stage2_simulation_crash",
             },
-        )
+        ), details={"results": "none"})
 
     # ── Compute aggregate metrics across the 3 regimes ────────────────────────
     agg = _aggregate_regime_results(results)
@@ -654,7 +689,7 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
     passed = (completion_rate >= STAGE2_COMPLETION_THRESHOLD) and queue_ok
 
     if not passed:
-        return EvaluationResult(
+        return _log_performance_check("stage2", program_path, EvaluationResult(
             metrics={
                 "stage2_passed": 0.0,
                 "combined_score": 0.0,
@@ -672,10 +707,10 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
                 ),
                 "failure_stage": "stage2_threshold",
             },
-        )
+        ), details={"passed": False, "completion_rate": completion_rate, "queue_wait_s": agg["mean_queue_wait_s"]})
 
     # ── Stage 2 Passed ────────────────────────────────────────────────────────
-    return EvaluationResult(
+    return _log_performance_check("stage2", program_path, EvaluationResult(
         metrics={
             "stage2_passed": 1.0,
             "combined_score": 1.0,
@@ -685,7 +720,7 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
             "stage2_misses": float(agg["total_misses"]),
         },
         artifacts={"stage2_summary": artifact_summary},
-    )
+    ), details={"passed": True, "completion_rate": completion_rate, "queue_wait_s": agg["mean_queue_wait_s"]})
 
 
 def evaluate_stage3(program_path: str) -> EvaluationResult:
@@ -725,7 +760,7 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
 
     # ── If no simulations succeeded, return catastrophic failure ──────────────
     if not results:
-        return EvaluationResult(
+        return _log_performance_check("stage3", program_path, EvaluationResult(
             metrics={
                 "combined_score": -9999.0,
                 "cost_savings": -100.0,
@@ -740,7 +775,7 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
                 "error_message": f"All Stage 3 simulations failed. Failed regimes: {failed_regimes}",
                 "failure_stage": "stage3_all_failed",
             },
-        )
+        ), details={"failed_regimes": failed_regimes})
 
     # ── Aggregate across all successful regimes ───────────────────────────────
     agg = _aggregate_regime_results(results)
@@ -769,7 +804,10 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         "  Fixed Capacity (0 miss): 27,900.0 worker-seconds, 0 misses",
     ]
 
-    return EvaluationResult(
+    regime_breakdowns = {
+        regime: res for regime, res in zip(ALL_REGIMES, results) if res is not None
+    }
+    eval_res = EvaluationResult(
         metrics={
             # Primary fitness signal (OpenEvolve maximizes combined_score)
             "combined_score": fitness_j,
@@ -788,6 +826,17 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         artifacts={
             "stage3_benchmark_report": "\n".join(artifact_lines),
             "failed_regimes": str(failed_regimes),
+        },
+    )
+    return _log_performance_check(
+        "stage3",
+        program_path,
+        eval_res,
+        details={
+            "regimes": regime_breakdowns,
+            "failed_regimes": failed_regimes,
+            "fitness_j": fitness_j,
+            "cost_savings": map_features["cost_savings"],
         },
     )
 

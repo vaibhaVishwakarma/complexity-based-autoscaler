@@ -31,11 +31,17 @@ data/tinyimagenet/val/
 !data/azure_traces/azure_functions_2019_processed.npz
 
 # ── Experiment Outputs & Runtime Logs ──────────────────────────────────────────
-output/
+output/*
+!output/evolved_policy.py
+!output/evolution_runs/
+output/evolution_runs/*
+!output/evolution_runs/*.csv
+gate*/output/
 runs/
 logs/
 *.log
 scratch/test_*/
+scratch/preflight_tmp/
 
 # ── Cloned Frameworks & External Repositories ───────────────────────────────────
 clones/

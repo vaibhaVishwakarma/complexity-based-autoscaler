@@ -59,7 +59,8 @@ if _env_file.exists():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip("'\""))
 
-for p in [str(SRC_PATH), str(CONTINUUM_SRC)]:
+SCRATCH_PATH = WORKSPACE_ROOT / "scratch"
+for p in [str(SRC_PATH), str(CONTINUUM_SRC), str(SCRATCH_PATH), str(WORKSPACE_ROOT)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
@@ -167,12 +168,11 @@ def export_best_policy(evolve_instance: OpenEvolve):
     """
     try:
         # Query the best program from the MAP-Elites archive
-        best_programs = evolve_instance.database.get_best_programs(n=1)
-        if not best_programs:
+        best = evolve_instance.database.get_best_program()
+        if not best:
             logger.warning("No programs in database — cannot export best policy.")
             return
 
-        best = best_programs[0]
         fitness = best.metrics.get("combined_score", float("-inf"))
 
         # Build provenance header documenting the discovered policy's origin
@@ -261,26 +261,50 @@ def main():
     logger.info(f"  Migration interval: {config.database.migration_interval}")
 
     evolve = OpenEvolve(
+        initial_program_path=str(SEED_POLICY_PATH),
         evaluation_file=str(EVALUATOR_PATH),
         config=config,
+        output_dir=str(EVOLUTION_OUTPUT_DIR),
         population_strategy=custom_population_strategy,
     )
 
+    # ── Hook real-time discovery log sync into checkpoint callback ────────────
+    # Automatically update CSV and Markdown discovery logs as each iteration finishes
+    orig_save_checkpoint = evolve._save_checkpoint
+
+    def _sync_logs_callback(iteration: int):
+        orig_save_checkpoint(iteration)
+        try:
+            from log_discovery import sync_logs
+            sync_logs()
+        except Exception as err:
+            logger.warning(f"Could not sync discovery logs at iteration {iteration}: {err}")
+
+    evolve._save_checkpoint = _sync_logs_callback
+
     # ── Run the evolutionary search ───────────────────────────────────────────
     logger.info("Launching evolutionary search...")
-    logger.info("Expected duration: ~90 minutes for 200 iterations (Stage 3 ~20s/eval)")
+    logger.info(f"Target iterations: {config.max_iterations}")
 
     try:
         import asyncio
-        # Read seed policy source code
-        with open(SEED_POLICY_PATH, "r") as f:
-            initial_program = f.read()
+
+        checkpoint_path = None
+        if args.resume:
+            checkpoints_dir = EVOLUTION_OUTPUT_DIR / "checkpoints"
+            if checkpoints_dir.exists():
+                ckpts = sorted(
+                    [d for d in checkpoints_dir.iterdir() if d.is_dir() and d.name.startswith("checkpoint_")],
+                    key=lambda p: int(p.name.split("_")[-1]) if p.name.split("_")[-1].isdigit() else -1,
+                )
+                if ckpts:
+                    checkpoint_path = str(ckpts[-1])
+                    logger.info(f"Resuming evolution from latest checkpoint: {checkpoint_path}")
+                else:
+                    logger.warning(f"No checkpoints found in {checkpoints_dir}. Starting fresh.")
 
         # Run evolution (asyncio entry point for OpenEvolve's async evaluation loop)
-        asyncio.run(evolve.run(
-            initial_program=initial_program,
-            num_iterations=config.max_iterations,
-        ))
+        asyncio.run(evolve.run(iterations=config.max_iterations, checkpoint_path=checkpoint_path))
 
     except KeyboardInterrupt:
         logger.info("Evolution interrupted by user (Ctrl+C). Saving best policy...")
@@ -292,9 +316,18 @@ def main():
         logger.info("Exporting best discovered policy...")
         export_best_policy(evolve)
 
+        # Update CSV and Markdown discovery logs
+        try:
+            from log_discovery import sync_logs
+            sync_logs()
+        except Exception as e:
+            logger.warning(f"Could not update discovery logs: {e}")
+
     logger.info("=" * 70)
-    logger.info("STEP 7 COMPLETE")
+    logger.info("STEP 7 ITERATION RUN FINISHED")
     logger.info(f"Best policy: {BEST_POLICY_OUTPUT}")
+    logger.info(f"Discovery Log: docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG.md")
+    logger.info(f"Performance CSV: output/evolution_runs/algorithm_performance_log.csv")
     logger.info(f"Database:    {config.database.db_path}")
     logger.info(f"Trace:       {config.evolution_trace.output_path}")
     logger.info("=" * 70)

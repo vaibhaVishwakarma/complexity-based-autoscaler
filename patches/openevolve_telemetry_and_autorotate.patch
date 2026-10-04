@@ -1,0 +1,346 @@
+diff --git a/openevolve/llm/openai.py b/openevolve/llm/openai.py
+index 8059b90..c671012 100644
+--- a/openevolve/llm/openai.py
++++ b/openevolve/llm/openai.py
+@@ -98,6 +98,46 @@ class OpenAILLM(LLMInterface):
+             logger.info(f"Initialized OpenAI LLM with model: {self.model}")
+             logger._initialized_models.add(self.model)
+ 
++    def _handle_quota_exhaustion(self) -> Optional[str]:
++        """
++        Attempts to auto-rotate the API key from .env.backup if available.
++        Updates self.api_key, self.client.api_key, and os.environ.
++        """
++        try:
++            from pathlib import Path
++            import sys
++            import os
++            for parent in [Path.cwd(), Path(__file__).resolve().parents[3], Path(__file__).resolve().parents[4]]:
++                if (parent / "scripts" / "rotate_api_key.py").exists():
++                    if str(parent) not in sys.path:
++                        sys.path.insert(0, str(parent))
++                    break
++
++            from scripts.rotate_api_key import (
++                DEFAULT_BACKUP_FILE,
++                DEFAULT_ENV_FILE,
++                rotate_to_next,
++                get_active_key,
++                mask_key,
++            )
++
++            if DEFAULT_BACKUP_FILE.exists():
++                idx, total, masked = rotate_to_next(DEFAULT_BACKUP_FILE, DEFAULT_ENV_FILE)
++                new_key = get_active_key(DEFAULT_ENV_FILE)
++                if new_key and new_key != self.api_key:
++                    self.api_key = new_key
++                    if self.client:
++                        self.client.api_key = new_key
++                    os.environ["GEMINI_API_KEY"] = new_key
++                    logger.info(
++                        f"🔄 [AUTO-KEY-ROTATION] Quota limit encountered. "
++                        f"Automatically rotated to Key #{idx}/{total} [{masked}]."
++                    )
++                    return new_key
++        except Exception as rot_err:
++            logger.warning(f"Auto-key-rotation attempt failed: {rot_err}")
++        return None
++
+     async def generate(self, prompt: str, **kwargs) -> str:
+         """Generate text from a prompt"""
+         return await self.generate_with_context(
+@@ -181,8 +221,8 @@ class OpenAILLM(LLMInterface):
+                 params["seed"] = seed
+ 
+         # Attempt the API call with retries
+-        retries = kwargs.get("retries", self.retries)
+-        retry_delay = kwargs.get("retry_delay", self.retry_delay)
++        retries = kwargs.get("retries", self.retries) or 3
++        retry_delay = kwargs.get("retry_delay", self.retry_delay) or 5.0
+ 
+         # Manual mode: no timeout unless explicitly passed by the caller
+         if self.manual_mode:
+@@ -203,6 +243,30 @@ class OpenAILLM(LLMInterface):
+                     logger.error(f"All {retries + 1} attempts failed with timeout")
+                     raise
+             except Exception as e:
++                err_type = type(e).__name__.lower()
++                err_str = (str(e) + " " + err_type).lower()
++                is_quota_or_rate_limit = any(
++                    term in err_str
++                    for term in [
++                        "429",
++                        "quota",
++                        "resource_exhausted",
++                        "rate_limit",
++                        "ratelimit",
++                        "badrequesterror",
++                        "invalid_argument",
++                        "400",
++                        "401",
++                        "403",
++                    ]
++                )
++                if is_quota_or_rate_limit:
++                    rotated_key = self._handle_quota_exhaustion()
++                    if rotated_key:
++                        logger.info("Retrying API call with newly rotated key...")
++                        await asyncio.sleep(1.0)
++                        continue
++
+                 if attempt < retries:
+                     logger.warning(
+                         f"Error on attempt {attempt + 1}/{retries + 1}: {str(e)}. Retrying..."
+diff --git a/openevolve/process_parallel.py b/openevolve/process_parallel.py
+index 06eb0f0..97eada2 100644
+--- a/openevolve/process_parallel.py
++++ b/openevolve/process_parallel.py
+@@ -202,6 +202,21 @@ def _run_iteration_worker(
+         )
+ 
+         iteration_start = time.time()
++        target_island = db_snapshot.get("sampling_island")
++        token_usage = None
++        llm_response = None
++
++        def _err_res(err_msg: str) -> SerializableResult:
++            return SerializableResult(
++                error=err_msg,
++                iteration=iteration,
++                token_usage=token_usage,
++                prompt=prompt,
++                llm_response=llm_response,
++                parent_id=parent.id if parent else None,
++                target_island=target_island,
++                iteration_time=time.time() - iteration_start,
++            )
+ 
+         # Generate code modification (sync wrapper for async)
+         try:
+@@ -214,13 +229,11 @@ def _run_iteration_worker(
+             token_usage = getattr(_worker_llm_ensemble, "last_usage", None)
+         except Exception as e:
+             logger.error(f"LLM generation failed: {e}")
+-            return SerializableResult(error=f"LLM generation failed: {str(e)}", iteration=iteration)
++            return _err_res(f"LLM generation failed: {str(e)}")
+ 
+         # Check for None response
+         if llm_response is None:
+-            return SerializableResult(
+-                error="LLM returned None response", iteration=iteration, token_usage=token_usage
+-            )
++            return _err_res("LLM returned None response")
+ 
+         # Parse response based on evolution mode
+         if _worker_config.diff_based_evolution:
+@@ -234,15 +247,9 @@ def _run_iteration_worker(
+             try:
+                 diff_blocks = extract_diffs(llm_response, _worker_config.diff_pattern)
+             except ValueError as exc:
+-                return SerializableResult(
+-                    error=str(exc), iteration=iteration, token_usage=token_usage
+-                )
++                return _err_res(str(exc))
+             if not diff_blocks:
+-                return SerializableResult(
+-                    error="No valid diffs found in response",
+-                    iteration=iteration,
+-                    token_usage=token_usage,
+-                )
++                return _err_res(f"No valid diffs found in response: {repr(llm_response[:150])}")
+ 
+             if _worker_config.prompt.programs_as_changes_description:
+                 try:
+@@ -252,9 +259,7 @@ def _run_iteration_worker(
+                         changes_description_text=parent_changes_desc,
+                     )
+                 except Exception as e:
+-                    return SerializableResult(
+-                        error=str(e), iteration=iteration, token_usage=token_usage
+-                    )
++                    return _err_res(str(e))
+ 
+                 child_code, _ = apply_diff_blocks(parent.code, code_blocks)
+                 child_changes_desc, desc_applied = apply_diff_blocks(
+@@ -267,11 +272,7 @@ def _run_iteration_worker(
+                     or not child_changes_desc.strip()
+                     or child_changes_desc.strip() == parent_changes_desc.strip()
+                 ):
+-                    return SerializableResult(
+-                        error="changes_description was not updated or empty, program is discarded",
+-                        iteration=iteration,
+-                        token_usage=token_usage,
+-                    )
++                    return _err_res("changes_description was not updated or empty, program is discarded")
+ 
+                 changes_summary = format_diff_summary(
+                     code_blocks,
+@@ -282,13 +283,9 @@ def _run_iteration_worker(
+                 # All diffs applied only to code
+                 child_code, applied = apply_diff_blocks(parent.code, diff_blocks)
+                 if applied == 0:
+-                    return SerializableResult(
+-                        error=(
+-                            f"None of the {len(diff_blocks)} SEARCH block(s) matched the "
+-                            "parent program"
+-                        ),
+-                        iteration=iteration,
+-                        token_usage=token_usage,
++                    return _err_res(
++                        f"None of the {len(diff_blocks)} SEARCH block(s) matched the "
++                        "parent program"
+                     )
+                 if applied < len(diff_blocks):
+                     logger.warning(
+@@ -296,11 +293,7 @@ def _run_iteration_worker(
+                         "SEARCH block(s) matched the parent program"
+                     )
+                 if child_code == parent.code:
+-                    return SerializableResult(
+-                        error="Diff did not change the parent program",
+-                        iteration=iteration,
+-                        token_usage=token_usage,
+-                    )
++                    return _err_res("Diff did not change the parent program")
+                 changes_summary = format_diff_summary(
+                     diff_blocks,
+                     max_line_len=_worker_config.prompt.diff_summary_max_line_len,
+@@ -311,18 +304,10 @@ def _run_iteration_worker(
+ 
+             new_code = parse_full_rewrite(llm_response, _worker_config.language)
+             if not new_code:
+-                return SerializableResult(
+-                    error=f"No valid code found in response",
+-                    iteration=iteration,
+-                    token_usage=token_usage,
+-                )
++                return _err_res("No valid code found in response")
+ 
+             if new_code == parent.code:
+-                return SerializableResult(
+-                    error="Rewrite is identical to the parent program",
+-                    iteration=iteration,
+-                    token_usage=token_usage,
+-                )
++                return _err_res("Rewrite is identical to the parent program")
+ 
+             child_code = new_code
+             changes_summary = "Full rewrite"
+@@ -334,27 +319,19 @@ def _run_iteration_worker(
+             try:
+                 enforced_code = enforce_evolve_blocks(parent.code, child_code)
+             except ValueError as exc:
+-                return SerializableResult(
+-                    error=str(exc), iteration=iteration, token_usage=token_usage
+-                )
++                return _err_res(str(exc))
+             if enforced_code != child_code:
+                 logger.info(
+                     f"Iteration {iteration}: reverted edits outside the EVOLVE-BLOCK regions"
+                 )
+                 child_code = enforced_code
+                 if child_code == parent.code:
+-                    return SerializableResult(
+-                        error="All edits were outside the EVOLVE-BLOCK regions",
+-                        iteration=iteration,
+-                        token_usage=token_usage,
+-                    )
++                    return _err_res("All edits were outside the EVOLVE-BLOCK regions")
+ 
+         # Check code length
+         if len(child_code) > _worker_config.max_code_length:
+-            return SerializableResult(
+-                error=f"Generated code exceeds maximum length ({len(child_code)} > {_worker_config.max_code_length})",
+-                iteration=iteration,
+-                token_usage=token_usage,
++            return _err_res(
++                f"Generated code exceeds maximum length ({len(child_code)} > {_worker_config.max_code_length})"
+             )
+ 
+         # Evaluate the child program
+@@ -403,7 +380,16 @@ def _run_iteration_worker(
+ 
+     except Exception as e:
+         logger.exception(f"Error in worker iteration {iteration}")
+-        return SerializableResult(error=str(e), iteration=iteration)
++        return SerializableResult(
++            error=str(e),
++            iteration=iteration,
++            token_usage=token_usage if 'token_usage' in locals() else None,
++            prompt=prompt if 'prompt' in locals() else None,
++            llm_response=llm_response if 'llm_response' in locals() else None,
++            parent_id=parent.id if 'parent' in locals() else None,
++            target_island=target_island if 'target_island' in locals() else None,
++            iteration_time=time.time() - iteration_start if 'iteration_start' in locals() else 0.0,
++        )
+ 
+ 
+ def _wait_for_processes(processes: tuple[mp.Process, ...], timeout: float) -> list[mp.Process]:
+@@ -637,6 +623,52 @@ class ProcessParallelController:
+             if callback:
+                 callback(iteration)
+ 
++    def _record_llm_call(self, iteration: int, result: SerializableResult) -> None:
++        """Appends an authoritative record of this LLM call to output_dir/llm_calls.jsonl."""
++        try:
++            import json
++            import time
++            from datetime import datetime, timezone
++            from pathlib import Path
++
++            output_dir = getattr(self.config, "output_dir", None) or "output/evolution_runs"
++            log_file = Path(output_dir) / "llm_calls.jsonl"
++            log_file.parent.mkdir(parents=True, exist_ok=True)
++
++            island_id = result.target_island
++            if island_id is None and result.child_program_dict:
++                island_id = result.child_program_dict.get("metadata", {}).get("island")
++            if island_id is None:
++                island_id = getattr(self.database, "current_island", 0)
++
++            child_id = None
++            changes_summary = None
++            if result.child_program_dict:
++                child_id = result.child_program_dict.get("id")
++                changes_summary = result.child_program_dict.get("metadata", {}).get("changes")
++            elif result.error:
++                changes_summary = f"Error: {result.error}"
++
++            record = {
++                "iteration": iteration,
++                "timestamp": time.time(),
++                "datetime": datetime.now(timezone.utc).isoformat(),
++                "island_id": island_id,
++                "parent_id": result.parent_id,
++                "child_id": child_id,
++                "status": "SUCCESS" if not result.error else "ERROR",
++                "error": result.error,
++                "token_usage": result.token_usage or {},
++                "duration_s": round(result.iteration_time, 2),
++                "changes_summary": changes_summary,
++                "prompt": result.prompt,
++                "llm_response": result.llm_response,
++            }
++            with open(log_file, "a") as f:
++                f.write(json.dumps(record) + "\n")
++        except Exception as e:
++            logger.warning("Failed to record LLM call for iteration %d: %s", iteration, e)
++
+     async def run_evolution(
+         self,
+         start_iteration: int,
+@@ -747,10 +779,14 @@ class ProcessParallelController:
+                     total_llm_calls += 1
+                     token_str = f" | tokens: {tt} (prompt: {pt}, completion: {ct})"
+ 
++                # Record authoritative LLM call log
++                self._record_llm_call(completed_iteration, result)
++
+                 if result.error:
+                     logger.warning(
+                         f"Iteration {completed_iteration} error: {result.error}{token_str}"
+                     )
++                    self._checkpoint_if_due(completed_iteration, checkpoint_callback)
+                 elif result.child_program_dict:
+                     # Reconstruct program from dict
+                     child_program = Program(**result.child_program_dict)

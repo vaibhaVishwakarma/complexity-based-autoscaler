@@ -23,7 +23,7 @@
 max_iterations: 200
 
 # Checkpoint: save database state every N iterations for resumability
-checkpoint_interval: 20
+checkpoint_interval: 1
 
 log_level: "INFO"
 
@@ -46,7 +46,7 @@ enforce_evolve_blocks: true
 
 # Maximum candidate policy code length (chars). Prevents bloated policies
 # that smuggle in lookup tables or hardcoded regime-specific branches.
-max_code_length: 5000
+max_code_length: 25000
 
 # ── Early Stopping ─────────────────────────────────────────────────────────
 # Stop if combined_score improvement < convergence_threshold for patience iters
@@ -63,23 +63,18 @@ early_stopping_metric: "combined_score"
 # ─────────────────────────────────────────────────────────────────────────────
 
 llm:
-  # Primary model: Gemini 2.5 Flash — fast, cost-effective mutation operator
-  api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
-  api_key: "${GEMINI_API_KEY}"
-  name: "gemini-2.5-flash"
-  provider: "openai"
-
-  # Generation parameters for formula mutation
-  temperature: 0.8      # Moderate temperature for creative but coherent diffs
-  max_tokens: 2048      # Sufficient for a focused SEARCH/REPLACE diff
-
-  # Retry configuration
-  timeout: 120
-  retries: 3
-  retry_delay: 5
-
-  # Reproducibility
-  random_seed: 42
+  models:
+    - name: "gemini-2.5-flash"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 1.0
+      temperature: 0.8
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,8 +93,8 @@ prompt:
   include_artifacts: true
   max_artifact_bytes: 10240  # 10KB — enough for benchmark reports
 
-  # Suggest simplification if policy exceeds 500 chars — prevents bloat
-  suggest_simplification_after_chars: 500
+  # Suggest simplification if policy exceeds 4000 chars — prevents bloat
+  suggest_simplification_after_chars: 4000
 
   # Per-island system messages enforce the asymmetric 3-branch topology:
   # Island 0: Core Conformal Branch (strict ACI, mathematical purity)
@@ -127,6 +122,14 @@ prompt:
       - InferLine blindness: 44 misses under p_fast collapse (use offered_cloud_rps!)
       - KEDA flapping: 1710 deltas (smooth actuation, add hysteresis)
 
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
     - |
       You are an expert researcher evolving the CONTINUOUS COMPLEXITY DYNAMICS RADICAL (Island 1).
       Your core mission: introduce a continuous dynamic factor representing the rate of
@@ -144,6 +147,14 @@ prompt:
       - Apply smooth decay when complexity decreases (p_fast_velocity > 0) to prevent premature worker kill
       - Modulate capacity non-linearly with mean_set_size ambiguity
       - HARD CONSTRAINTS: Only state.* attributes, no unauthorized imports, return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
 
     - |
       You are an expert researcher evolving the INFERLINE-CONFORMAL HYBRID RADICAL (Island 2).
@@ -166,6 +177,14 @@ prompt:
       - Add hysteresis / cooldown tracking using state.time_since_last_scale_s to maintain low churn
       - Protect scale-to-zero using state.booting_workers and state.oldest_task_age_s
       - HARD CONSTRAINTS: Only state.* attributes, no unauthorized imports, return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -263,7 +282,7 @@ evolution_trace:
   enabled: true
   format: "jsonl"
   include_code: true
-  include_prompts: false  # Disable to save disk space; prompts logged per-program
+  include_prompts: true
   output_path: "output/evolution_runs/evolution_trace.jsonl"
-  buffer_size: 10
+  buffer_size: 1
   compress: false
