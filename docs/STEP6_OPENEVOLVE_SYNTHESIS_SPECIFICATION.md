@@ -211,27 +211,29 @@ Archive & Population Update
 
 ---
 
-## 5. Asymmetric Island Topology: Directed One-Way Gene Flow
+## 5. Asymmetric Island Topology: Directed One-Way Gene Flow (3 Branches)
 
-To explore high-risk, creative policy mutations without risking corruption of the mathematically sound conformal baseline, we implement an **Asymmetric Source-Sink Island Topology** using OpenEvolve's `PopulationStrategy.migrate` hook.
+To explore high-risk, creative policy mutations without risking corruption of the mathematically sound conformal baseline, we implement a **Tri-Branch Asymmetric Source-Sink Island Topology** using OpenEvolve's `PopulationStrategy.migrate` hook.
 
 ```
-  ┌────────────────────────────────────────────────────────┐
-  │         ISLAND 0: Core Conformal Branch (Source)       │
-  │  • Strict Adaptive Conformal Inference (ACI)           │
-  │  • Asymmetric scale-down with statistical certainty   │
-  │  • Receives ZERO migrations from Island 1              │
-  └───────────────────────────┬────────────────────────────┘
-                              │
-                              │  ONE-WAY MIGRATION
-                              │  (Core breakthroughs flow down)
-                              ▼
-  ┌────────────────────────────────────────────────────────┐
-  │      ISLAND 1: Experimental Radical Branch (Sink)      │
-  │  • Non-linear momentum, learned preemption heuristics  │
-  │  • High exploration temperature                        │
-  │  • NEVER sends programs back to Island 0               │
-  └────────────────────────────────────────────────────────┘
+                          ┌────────────────────────────────────────────────────────┐
+                          │         ISLAND 0: Core Conformal Branch (Source)       │
+                          │  • Strict Adaptive Conformal Inference (ACI)           │
+                          │  • Asymmetric scale-down with statistical certainty   │
+                          │  • Receives ZERO migrations from Island 1 or Island 2  │
+                          └───────────────────────────┬────────────────────────────┘
+                                                      │
+                                    ONE-WAY MIGRATION │ (Breakthroughs flow down)
+                                 ┌────────────────────┴────────────────────┐
+                                 │                                         │
+                                 ▼                                         ▼
+  ┌──────────────────────────────────────────────┐       ┌──────────────────────────────────────────────┐
+  │  ISLAND 1: Continuous Complexity Radical     │       │   ISLAND 2: InferLine-Hybrid Radical         │
+  │  • Continuous factor: dp_fast/dt, d^2λ/dt^2  │       │   • Anchored on InferLine's proven envelope  │
+  │  • Predictive preemption on complexity surge │       │   • Never worse than baseline on trivial jobs│
+  │  • Continuous set-size uncertainty weighting │       │   • Augmented with conformal semantic triage │
+  │  • NEVER sends programs back to Island 0     │       │   • NEVER sends programs back to Island 0    │
+  └──────────────────────────────────────────────┘       └──────────────────────────────────────────────┘
 ```
 
 ### 5.1 Python Implementation of Directed Migration
@@ -240,20 +242,26 @@ from openevolve.population import PopulationStrategy, MigrationMove, PopulationS
 
 def directed_source_sink_migration(snapshot: PopulationSnapshot) -> list[MigrationMove]:
     """
-    Enforces asymmetric gene flow:
-    - Island 0 (Core) -> Island 1 (Experimental): ALLOWED
-    - Island 1 (Experimental) -> Island 0 (Core): FORBIDDEN
+    Enforces asymmetric one-way gene flow across 3 specialized branches:
+    - Island 0 (Core) -> Island 1 (Continuous Complexity Radical): ALLOWED
+    - Island 0 (Core) -> Island 2 (InferLine-Conformal Hybrid): ALLOWED
+    - Island 1 or 2 -> Island 0 (Core): FORBIDDEN
     """
     moves = []
-    # Identify the elite program on Island 0
+    if not snapshot.islands or len(snapshot.islands) == 0:
+        return moves
+        
     island_0_pids = list(snapshot.islands[0])
     if island_0_pids:
         best_p0_id = max(
             island_0_pids,
             key=lambda pid: snapshot.programs[pid].metrics.get("combined_score", float("-inf"))
         )
-        # Migrate a copy of the Core elite into the Experimental Island
-        moves.append(MigrationMove(program_id=best_p0_id, target_island=1))
+        # Migrate Core elite into both radical branches
+        if len(snapshot.islands) > 1:
+            moves.append(MigrationMove(program_id=best_p0_id, target_island=1))
+        if len(snapshot.islands) > 2:
+            moves.append(MigrationMove(program_id=best_p0_id, target_island=2))
         
     # Island 0 receives NO incoming moves, preserving mathematical purity
     return moves

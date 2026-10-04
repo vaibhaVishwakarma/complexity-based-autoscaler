@@ -33,6 +33,7 @@ output/
 runs/
 logs/
 *.log
+scratch/test_*/
 
 # ── Cloned Frameworks & External Repositories ───────────────────────────────────
 clones/

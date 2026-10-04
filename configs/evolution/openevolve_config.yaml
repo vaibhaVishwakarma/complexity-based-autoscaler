@@ -1,0 +1,269 @@
+# openevolve_config.yaml — Step 6: OpenEvolve Evolutionary Policy Synthesis Configuration
+#
+# Role:
+#   Master configuration for the OpenEvolve evolutionary search that synthesizes
+#   the Pareto-optimal Conformal Autoscaler policy. All operational parameters,
+#   thresholds, model names, and timeouts are defined here — never hardcoded in
+#   Python source (AGENTS.md Rule #2 compliance).
+#
+# Gate Stage:   Step 6 (OpenEvolve Evaluator & Fitness Engine)
+# Roadmap Ref:  docs/STEP6_OPENEVOLVE_SYNTHESIS_SPECIFICATION.md Sections 5, 6, 7
+# Strategy Ref: docs/CONFORMAL_AUTOSCALER_STRATEGY.md Section 9
+#
+# Usage:
+#   Loaded by scratch/run_evolution.py via openevolve.Config.from_yaml(path).
+#   See scratch/run_evolution.py for the full launch command.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOP-LEVEL EVOLUTION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Total evolution iterations (LLM → evaluate → archive cycles)
+# 200 iterations × ~25s avg evaluation ≈ ~90 minutes total wall-clock
+max_iterations: 200
+
+# Checkpoint: save database state every N iterations for resumability
+checkpoint_interval: 20
+
+log_level: "INFO"
+
+# Reproducibility seed — matches simulation seeds (AGENTS.md Rule: SEED = 42)
+random_seed: 42
+
+# Python is the target language for the candidate policies
+language: "python"
+file_suffix: ".py"
+
+# ── Evolution Mode ─────────────────────────────────────────────────────────
+# diff_based_evolution: true — LLM generates SEARCH/REPLACE diffs modifying
+# the formula inside EVOLVE-BLOCK-START/END rather than full rewrites.
+# This keeps mutations focused on the mathematical policy formula.
+diff_based_evolution: true
+
+# enforce_evolve_blocks: true — any LLM edits OUTSIDE the EVOLVE-BLOCK markers
+# are silently reverted. Protects TelemetricState contract and module structure.
+enforce_evolve_blocks: true
+
+# Maximum candidate policy code length (chars). Prevents bloated policies
+# that smuggle in lookup tables or hardcoded regime-specific branches.
+max_code_length: 5000
+
+# ── Early Stopping ─────────────────────────────────────────────────────────
+# Stop if combined_score improvement < convergence_threshold for patience iters
+early_stopping_patience: 50
+convergence_threshold: 0.01
+early_stopping_metric: "combined_score"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM CONFIGURATION
+# Uses Gemini 2.5 Flash as primary (fast iteration) and Gemini 2.5 Pro as
+# secondary (deeper reasoning for complex formula rewrites).
+# API key must be set in GEMINI_API_KEY environment variable.
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  # Primary model: Gemini 2.5 Flash — fast, cost-effective mutation operator
+  api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+  api_key: "${GEMINI_API_KEY}"
+  name: "gemini-2.5-flash"
+  provider: "openai"
+
+  # Generation parameters for formula mutation
+  temperature: 0.8      # Moderate temperature for creative but coherent diffs
+  max_tokens: 2048      # Sufficient for a focused SEARCH/REPLACE diff
+
+  # Retry configuration
+  timeout: 120
+  retries: 3
+  retry_delay: 5
+
+  # Reproducibility
+  random_seed: 42
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMPT CONFIGURATION
+# System messages shape the LLM's mutation strategy. Island-specific messages
+# enforce the Core vs. Experimental branch distinction.
+# ─────────────────────────────────────────────────────────────────────────────
+
+prompt:
+  # Number of top-performing programs shown in each prompt (exploitation)
+  num_top_programs: 3
+  # Number of diverse programs shown in each prompt (exploration)
+  num_diverse_programs: 2
+
+  # Include Stage 3 artifacts (benchmark report, error messages) in LLM feedback
+  include_artifacts: true
+  max_artifact_bytes: 10240  # 10KB — enough for benchmark reports
+
+  # Suggest simplification if policy exceeds 500 chars — prevents bloat
+  suggest_simplification_after_chars: 500
+
+  # Per-island system messages enforce the asymmetric 3-branch topology:
+  # Island 0: Core Conformal Branch (strict ACI, mathematical purity)
+  # Island 1: Continuous Complexity Dynamic Radical (derivative/integral complexity tracking)
+  # Island 2: InferLine-Conformal Hybrid Radical (built on InferLine's proven foundation)
+  island_system_messages:
+    - |
+      You are an expert autoscaling policy researcher evolving the CORE CONFORMAL branch (Island 0).
+      Your goal: find the mathematically optimal conformal scaling formula that:
+      1. Minimizes deadline misses (weight 1.0 — highest priority)
+      2. Minimizes GPU worker-seconds (weight 0.002 — 48.9% savings vs Fixed Capacity baseline)
+      3. Minimizes scaling flapping (weight 0.05 — smooth actuation)
+      4. Maximizes completed requests (weight 0.01 — throughput reward)
+
+      RULES for Core branch:
+      - Only use state.* attributes defined in TelemetricState (no hallucinations)
+      - No imports except `math` and `dataclasses`
+      - Return int k ∈ [1, 18] (cloud cluster capacity: 6 nodes × 3 workers)
+      - Preserve mathematical rigor: asymmetric scale-down, conformal uncertainty bounds
+      - offered_cloud_rps = ingress_rps * (1 - p_fast) is the KEY causal signal —
+        use it to distinguish semantic drift from volume changes
+
+      Key failure modes to eliminate:
+      - HPA drain drop: 72 misses when λ→0 (guard against premature worker kill)
+      - InferLine blindness: 44 misses under p_fast collapse (use offered_cloud_rps!)
+      - KEDA flapping: 1710 deltas (smooth actuation, add hysteresis)
+
+    - |
+      You are an expert researcher evolving the CONTINUOUS COMPLEXITY DYNAMICS RADICAL (Island 1).
+      Your core mission: introduce a continuous dynamic factor representing the rate of
+      increase or decrease of complexity to preemptively scale before queues ever form.
+
+      Available continuous signals in TelemetricState:
+      - state.p_fast_velocity: dp_fast/dt over 3 epochs (<0 means complexity surging, >0 means relaxing)
+      - state.ingress_acceleration: d^2(lambda)/dt^2 indicating sudden ramp onset
+      - state.mean_set_size: E[|C(x)|] >= 1.0 indicating model classification ambiguity
+      - state.cloud_queue_velocity: dQ/dt differentiating transient spikes from sustained backlogs
+
+      Design directives:
+      - Construct a continuous complexity factor: e.g. complexity_surge = max(0.0, -state.p_fast_velocity)
+      - Apply proactive scaling when complexity surges (p_fast_velocity < 0) before queue grows
+      - Apply smooth decay when complexity decreases (p_fast_velocity > 0) to prevent premature worker kill
+      - Modulate capacity non-linearly with mean_set_size ambiguity
+      - HARD CONSTRAINTS: Only state.* attributes, no unauthorized imports, return int k in [1, 18].
+
+    - |
+      You are an expert researcher evolving the INFERLINE-CONFORMAL HYBRID RADICAL (Island 2).
+      Your core mission: take InferLine (ACM SoCC '20) as the starting point and build
+      semantic complexity-awareness on top of it!
+
+      Context & Objective:
+      - In our empirical baseline benchmark, InferLine achieved 48.9% cost savings (best of all baselines),
+        with very low flapping (855 deltas), but suffered 44 deadline misses because it was
+        SEMANTICALLY BLIND to fast-path collapse (it only looked at arrival volume and queue delay).
+      - The discovered autoscaler MUST NOT BE WORSE than InferLine on standard/trivial autoscaling jobs;
+        it must preserve InferLine's high cost efficiency and stable actuation, but be STRICTLY BETTER
+        by incorporating conformal triage awareness (state.offered_cloud_rps and state.p_fast).
+
+      Design directives:
+      - Base sizing on InferLine-style stable demand + queue drainage:
+          demand = state.offered_cloud_rps  # causal cloud demand: ingress * (1 - p_fast)
+          drain = state.cloud_queue_depth / drain_budget_s
+      - Augment with conformal safety headroom proportional to state.mean_set_size
+      - Add hysteresis / cooldown tracking using state.time_since_last_scale_s to maintain low churn
+      - Protect scale-to-zero using state.booting_workers and state.oldest_task_age_s
+      - HARD CONSTRAINTS: Only state.* attributes, no unauthorized imports, return int k in [1, 18].
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE CONFIGURATION (MAP-Elites Archive & Island Topology)
+# ─────────────────────────────────────────────────────────────────────────────
+
+database:
+  # Store database on disk for checkpointing and post-analysis
+  in_memory: false
+  db_path: "output/evolution_runs/openevolve_db"
+
+  # Population parameters
+  population_size: 500
+  archive_size: 100
+
+  # ── Asymmetric Island Topology (3 Specialized Branches) ────────────────────
+  # Island 0: Core Conformal Branch (strict ACI, mathematical purity)
+  # Island 1: Continuous Complexity Dynamic Radical (derivative/integral complexity tracking)
+  # Island 2: InferLine-Conformal Hybrid Radical (built on InferLine's proven foundation)
+  num_islands: 3
+
+  # Selection pressure: 10% elite, 70% exploitation, 20% exploration
+  elite_selection_ratio: 0.10
+  exploitation_ratio: 0.70
+  exploration_ratio: 0.20
+
+  # ── MAP-Elites Quality-Diversity Feature Dimensions ────────────────────────
+  # Three orthogonal dimensions ensure the archive preserves diverse policy
+  # phenotypes along the Pareto frontier (cost vs. reliability vs. stability).
+  #
+  # CRITICAL: evaluator returns RAW CONTINUOUS VALUES for these dimensions.
+  # OpenEvolve handles binning internally — never pre-compute bin indices.
+  #
+  # cost_savings    = (1 - worker_seconds / 27900) * 100  (% vs Fixed Capacity)
+  # churn_stability = 2000.0 - scaling_deltas             (higher = less flapping)
+  # tail_safety     = 15.0 - max_p99_latency_s            (higher = more SLA margin)
+  feature_dimensions:
+    - "cost_savings"
+    - "churn_stability"
+    - "tail_safety"
+  feature_bins: 10   # 10 × 10 × 10 = 1000-cell MAP-Elites grid per island
+
+  # ── Island Migration ────────────────────────────────────────────────────────
+  # migration_interval: trigger directed_source_sink_migration every 20 iters
+  # (custom hook in src/continuum_ext/evolution/population_policy.py replaces
+  # the default ring topology — Island 0 → Island 1 only, never reverse)
+  migration_interval: 20
+  migration_rate: 0.10
+
+  # Reproducibility
+  random_seed: 42
+
+  # Artifact storage
+  log_prompts: true
+  enable_artifacts: true
+  cleanup_old_artifacts: false  # Keep all artifacts for post-analysis
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVALUATOR CONFIGURATION (Cascade Pipeline)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evaluator:
+  # Wall-clock timeout per full evaluation chain (all 3 stages)
+  timeout: 300  # 5 minutes: Stage1(0.05s) + Stage2(~10s) + Stage3(~90s) + buffer
+
+  # Cascade mode: enables evaluate_stage1 → stage2 → stage3 progression
+  cascade_evaluation: true
+
+  # Cascade thresholds (combined_score required to advance to next stage):
+  #   cascade_thresholds[0] = 0.5: Stage 1 → Stage 2 (binary validity gate: 0.0 or 1.0)
+  #   cascade_thresholds[1] = 0.5: Stage 2 → Stage 3 (binary validity gate: 0.0 or 1.0)
+  #     Completion ≥ 90% and queue wait < 1.0s produces combined_score = 1.0.
+  #     Only provably broken policies (crashes, massive queues) fail Stage 2.
+  cascade_thresholds:
+    - 0.5
+    - 0.5
+
+  # Sequential evaluation (parallel_evaluations=1) because ContinuumBench
+  # simulations use global Eclypse event loop state — no shared memory issues.
+  parallel_evaluations: 1
+
+  # Enable artifact storage for LLM feedback loop
+  enable_artifacts: true
+  max_artifact_storage: 104857600  # 100MB
+
+  max_retries: 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVOLUTION TRACE LOGGING (for post-analysis and paper figures)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evolution_trace:
+  enabled: true
+  format: "jsonl"
+  include_code: true
+  include_prompts: false  # Disable to save disk space; prompts logged per-program
+  output_path: "output/evolution_runs/evolution_trace.jsonl"
+  buffer_size: 10
+  compress: false
