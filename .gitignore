@@ -38,7 +38,7 @@ logs/
 clones/
 
 # ── Reference Papers & External Evaluation Methodologies ───────────────────────
-references/
+/references/
 
 # ── OS & IDE Metadata ──────────────────────────────────────────────────────────
 .DS_Store
