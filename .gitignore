@@ -23,6 +23,7 @@ models/*.onnx.data
 *.bin
 *.tar.gz
 !models/.gitkeep
+!bundles/*.tar.gz
 
 # ── Datasets & Large Image Splits ──────────────────────────────────────────────
 .cache/

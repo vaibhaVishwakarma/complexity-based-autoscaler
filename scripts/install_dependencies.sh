@@ -50,34 +50,41 @@ echo "[2/6] Upgrading pip, setuptools, wheel..."
 echo "[3/6] Installing packages from requirements.txt..."
 "${VENV_PIP}" install -r requirements.txt
 
-# ── 3. Clone External Repositories (if not present) ──────────────────────────
+# ── 3. Extract Verified Framework Bundle (or clone if missing) ───────────────
 mkdir -p "${WORKSPACE_ROOT}/clones"
 mkdir -p "${WORKSPACE_ROOT}/patches"
 
-echo "[4/6] Checking external repositories in clones/..."
-
-# (a) eclypse
-if [ ! -d "${WORKSPACE_ROOT}/clones/eclypse/.git" ]; then
-    echo "  -> Cloning eclypse..."
-    git clone https://github.com/eclypse-org/eclypse.git "${WORKSPACE_ROOT}/clones/eclypse"
+if [ -f "${WORKSPACE_ROOT}/bundles/clones.tar.gz" ]; then
+    echo "[4/6] Extracting verified pre-patched frameworks bundle (bundles/clones.tar.gz)..."
+    tar -xzf "${WORKSPACE_ROOT}/bundles/clones.tar.gz" -C "${WORKSPACE_ROOT}"
+    echo "  -> Extracted ContinuumBench, eclypse (v0.8.1 commit 73806b7), and openevolve."
 else
-    echo "  -> eclypse already present."
-fi
+    echo "[4/6] Bundle not found; checking external repositories in clones/..."
 
-# (b) ContinuumBench
-if [ ! -d "${WORKSPACE_ROOT}/clones/ContinuumBench/.git" ]; then
-    echo "  -> Cloning ContinuumBench..."
-    git clone https://github.com/lilanpei/ContinuumBench.git "${WORKSPACE_ROOT}/clones/ContinuumBench"
-else
-    echo "  -> ContinuumBench already present."
-fi
+    # (a) eclypse - pin to commit 73806b7 (v0.8.1 required by ContinuumBench)
+    if [ ! -d "${WORKSPACE_ROOT}/clones/eclypse/.git" ]; then
+        echo "  -> Cloning eclypse..."
+        git clone https://github.com/eclypse-org/eclypse.git "${WORKSPACE_ROOT}/clones/eclypse"
+        (cd "${WORKSPACE_ROOT}/clones/eclypse" && git checkout 73806b7)
+    else
+        echo "  -> eclypse already present."
+    fi
 
-# (c) OpenEvolve
-if [ ! -d "${WORKSPACE_ROOT}/clones/openevolve/.git" ]; then
-    echo "  -> Cloning OpenEvolve..."
-    git clone https://github.com/algorithmicsuperintelligence/openevolve.git "${WORKSPACE_ROOT}/clones/openevolve"
-else
-    echo "  -> OpenEvolve already present."
+    # (b) ContinuumBench
+    if [ ! -d "${WORKSPACE_ROOT}/clones/ContinuumBench/.git" ]; then
+        echo "  -> Cloning ContinuumBench..."
+        git clone https://github.com/lilanpei/ContinuumBench.git "${WORKSPACE_ROOT}/clones/ContinuumBench"
+    else
+        echo "  -> ContinuumBench already present."
+    fi
+
+    # (c) OpenEvolve
+    if [ ! -d "${WORKSPACE_ROOT}/clones/openevolve/.git" ]; then
+        echo "  -> Cloning OpenEvolve..."
+        git clone https://github.com/algorithmicsuperintelligence/openevolve.git "${WORKSPACE_ROOT}/clones/openevolve"
+    else
+        echo "  -> OpenEvolve already present."
+    fi
 fi
 
 # ── 4. Apply Patches & Synchronize Extension Files ───────────────────────────
