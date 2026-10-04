@@ -103,6 +103,10 @@ def parse_args():
         help="Resume from existing checkpoint in output/evolution_runs/openevolve_db/",
     )
     parser.add_argument(
+        "--reset", action="store_true",
+        help="Safely archive existing database and checkpoints to start from iteration 0.",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="Run 3 iterations only to validate the full pipeline end-to-end.",
     )
@@ -255,6 +259,28 @@ def main():
         config.max_iterations = 3
         config.checkpoint_interval = 1
         logger.info("DRY RUN mode: 3 iterations only")
+
+    # ── Handle --reset request ─────────────────────────────────────────────────
+    if args.reset:
+        import shutil
+        from datetime import datetime, timezone
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        archive_dir = EVOLUTION_OUTPUT_DIR / f"archive_reset_{timestamp}"
+        items_to_archive = [
+            EVOLUTION_OUTPUT_DIR / "checkpoints",
+            EVOLUTION_OUTPUT_DIR / "openevolve_db",
+            EVOLUTION_OUTPUT_DIR / "evolution_trace.jsonl",
+            EVOLUTION_OUTPUT_DIR / "evaluator_checks.jsonl",
+            EVOLUTION_OUTPUT_DIR / "algorithm_performance_log.csv",
+            EVOLUTION_OUTPUT_DIR / "llm_calls.jsonl",
+            EVOLUTION_OUTPUT_DIR / "llm_calls_log.csv",
+        ]
+        if any(item.exists() for item in items_to_archive):
+            archive_dir.mkdir(parents=True, exist_ok=True)
+            for item in items_to_archive:
+                if item.exists():
+                    shutil.move(str(item), str(archive_dir / item.name))
+            logger.info(f"Evolution state reset. Previous run archived to {archive_dir}")
 
     # ── Create output directories ──────────────────────────────────────────────
     EVOLUTION_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

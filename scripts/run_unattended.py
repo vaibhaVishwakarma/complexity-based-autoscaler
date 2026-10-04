@@ -156,6 +156,47 @@ def run_supervisor(target_iterations: int, max_consecutive_failures: int = 5):
             time.sleep(10)
 
 
+def reset_evolution_state() -> None:
+    """
+    Safely archives all previous evolution run artifacts (checkpoints, database,
+    traces, performance logs) into an archive directory so the supervisor starts
+    cleanly from iteration 0.
+    """
+    import shutil
+    from datetime import datetime, timezone
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    archive_dir = WORKSPACE_ROOT / "output" / "evolution_runs" / f"archive_reset_{timestamp}"
+
+    items_to_archive = [
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "checkpoints",
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "openevolve_db",
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "evolution_trace.jsonl",
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "evaluator_checks.jsonl",
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "algorithm_performance_log.csv",
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "llm_calls.jsonl",
+        WORKSPACE_ROOT / "output" / "evolution_runs" / "llm_calls_log.csv",
+    ]
+
+    has_items = any(item.exists() for item in items_to_archive)
+    if has_items:
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        for item in items_to_archive:
+            if item.exists():
+                dest = archive_dir / item.name
+                logger.info(f"[RESET] Archiving {item.name} → {dest}")
+                shutil.move(str(item), str(dest))
+
+    # Also clean temporary candidate directories
+    evolution_runs_dir = WORKSPACE_ROOT / "output" / "evolution_runs"
+    if evolution_runs_dir.exists():
+        for d in evolution_runs_dir.glob("tmp*"):
+            if d.is_dir():
+                shutil.rmtree(str(d), ignore_errors=True)
+
+    logger.info(f"[RESET] ✓ Evolution state reset. Starting fresh from iteration 0.")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Unattended supervisor for OpenEvolve policy search on Codespaces."
@@ -168,7 +209,15 @@ def main():
         "--max-failures", type=int, default=5,
         help="Maximum consecutive crashes before aborting (default: 5).",
     )
+    parser.add_argument(
+        "--reset", action="store_true",
+        help="Reset evolution state: safely archive existing checkpoints and database to start from iteration 0.",
+    )
     args = parser.parse_args()
+
+    if args.reset:
+        reset_evolution_state()
+
     run_supervisor(args.iterations, args.max_failures)
 
 
