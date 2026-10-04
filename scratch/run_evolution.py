@@ -48,6 +48,17 @@ WORKSPACE_ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = WORKSPACE_ROOT / "src"
 CONTINUUM_SRC = WORKSPACE_ROOT / "clones" / "ContinuumBench" / "src"
 
+# Auto-load .env file if present at workspace root
+_env_file = WORKSPACE_ROOT / ".env"
+if _env_file.exists():
+    import os
+    with open(_env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+
 for p in [str(SRC_PATH), str(CONTINUUM_SRC)]:
     if p not in sys.path:
         sys.path.insert(0, p)
