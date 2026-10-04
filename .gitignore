@@ -40,6 +40,8 @@ gate*/output/
 runs/
 logs/
 *.log
+*.log.*
+evolution.log*
 scratch/test_*/
 scratch/preflight_tmp/
 

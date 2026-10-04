@@ -89,12 +89,15 @@ if [ -f "${WORKSPACE_ROOT}/patches/continuum_bench.patch" ]; then
 fi
 
 # Sync conformal controllers and workloads into ContinuumBench
-cp -f "${WORKSPACE_ROOT}/src/continuum_ext/controllers/conformal_controllers.py" \
-      "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/controllers/" 2>/dev/null || true
-cp -f "${WORKSPACE_ROOT}/src/continuum_ext/controllers/extensions_local.py" \
-      "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/controllers/" 2>/dev/null || true
-cp -f "${WORKSPACE_ROOT}/src/continuum_ext/workload/conformal_workloads.py" \
-      "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/workload/" 2>/dev/null || true
+mkdir -p "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/controllers/"
+mkdir -p "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/workload/"
+
+cp -fv "${WORKSPACE_ROOT}/src/continuum_ext/controllers/conformal_controllers.py" \
+      "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/controllers/"
+cp -fv "${WORKSPACE_ROOT}/src/continuum_ext/controllers/extensions_local.py" \
+      "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/controllers/"
+cp -fv "${WORKSPACE_ROOT}/src/continuum_ext/workload/conformal_workloads.py" \
+      "${WORKSPACE_ROOT}/clones/ContinuumBench/src/continuum_bench/workload/"
 
 # Apply OpenEvolve patch (logging hooks + in-flight auto-rotation)
 if [ -f "${WORKSPACE_ROOT}/patches/openevolve_telemetry_and_autorotate.patch" ]; then
@@ -114,10 +117,13 @@ echo "Verifying environment integrity..."
 import openevolve
 import continuum_bench
 import eclypse
+from continuum_bench.controllers.extensions import build_extension_controller
+from continuum_bench.workload import build_stream
 import scipy
 import pydantic
 import openai
 print('✓ All core frameworks imported successfully.')
+print('✓ ContinuumBench extension hooks and workload generators verified.')
 print('✓ Python environment is ready for evolutionary policy search.')
 "
 

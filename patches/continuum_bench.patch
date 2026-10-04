@@ -1,5 +1,20 @@
+diff --git a/src/continuum_bench/controllers/extensions.py b/src/continuum_bench/controllers/extensions.py
+index 1ba217c..297982e 100644
+--- a/src/continuum_bench/controllers/extensions.py
++++ b/src/continuum_bench/controllers/extensions.py
+@@ -23,6 +23,9 @@ def build_extension_controller(name: str, config: Dict[str, Any], runner: Any) -
+     try:
+         from continuum_bench.controllers import extensions_local
+     except ImportError:
+-        return None
++        try:
++            from continuum_ext.controllers import extensions_local
++        except ImportError:
++            return None
+ 
+     return extensions_local.build(name, config, runner)
 diff --git a/src/continuum_bench/workload/__init__.py b/src/continuum_bench/workload/__init__.py
-index a7ed84d..0e491f3 100644
+index a7ed84d..2b1bd4a 100644
 --- a/src/continuum_bench/workload/__init__.py
 +++ b/src/continuum_bench/workload/__init__.py
 @@ -1,5 +1,7 @@
@@ -10,20 +25,28 @@ index a7ed84d..0e491f3 100644
  from continuum_bench.workload.mmpp import (
      JitteredBurstSpec,
      JitteredBurstWorkload,
-@@ -9,9 +11,27 @@ from continuum_bench.workload.mmpp import (
+@@ -9,8 +11,34 @@ from continuum_bench.workload.mmpp import (
      PiecewiseRegimeWorkload,
      RegimeSegment,
      WorkloadStream,
 -    build_stream,
 +    build_stream as _build_stream_mmpp,
 +)
-+from continuum_bench.workload.conformal_workloads import (
-+    REGIME_INITIALIZATION_PROFILES,
-+    WorkloadStream2D,
-+    build_2d_stream,
-+    get_regime_initialization,
- )
- 
++try:
++    from continuum_bench.workload.conformal_workloads import (
++        REGIME_INITIALIZATION_PROFILES,
++        WorkloadStream2D,
++        build_2d_stream,
++        get_regime_initialization,
++    )
++except ImportError:
++    from continuum_ext.workload.conformal_workloads import (
++        REGIME_INITIALIZATION_PROFILES,
++        WorkloadStream2D,
++        build_2d_stream,
++        get_regime_initialization,
++    )
++
 +
 +def build_stream(config: Dict[str, Any], seed: int) -> WorkloadStream:
 +    """Build a workload stream, delegating 2D conformal generators to build_2d_stream."""
@@ -35,11 +58,10 @@ index a7ed84d..0e491f3 100644
 +    except ValueError:
 +        return build_2d_stream(config, seed)
 +
-+
+ 
  __all__ = [
      "JitteredBurstSpec",
-     "JitteredBurstWorkload",
-@@ -21,5 +41,9 @@ __all__ = [
+@@ -21,5 +49,9 @@ __all__ = [
      "PiecewiseRegimeWorkload",
      "RegimeSegment",
      "WorkloadStream",

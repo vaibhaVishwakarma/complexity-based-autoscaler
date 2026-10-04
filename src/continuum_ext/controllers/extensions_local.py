@@ -107,7 +107,10 @@ def build(name: str, config: Dict[str, Any], runner: Any) -> Optional[Any]:
         )
 
     if name in {"fixed", "fixed_capacity"}:
-        from continuum_bench.controllers.conformal_controllers import FixedCapacityController
+        try:
+            from continuum_bench.controllers.conformal_controllers import FixedCapacityController
+        except ImportError:
+            from continuum_ext.controllers.conformal_controllers import FixedCapacityController
 
         scaling_cfg = config.get("scaling", {})
         pool_cfg = scaling_cfg.get("pools", {}).get("CloudRefine", {})
@@ -120,7 +123,10 @@ def build(name: str, config: Dict[str, Any], runner: Any) -> Optional[Any]:
         )
 
     if name in {"inferline", "inferline_controller"}:
-        from continuum_bench.controllers.conformal_controllers import InferLineController
+        try:
+            from continuum_bench.controllers.conformal_controllers import InferLineController
+        except ImportError:
+            from continuum_ext.controllers.conformal_controllers import InferLineController
 
         inferline_cfg = config.get("autoscaling", {}).get("inferline", {})
         placement_cfg = config.get("placement", {})
@@ -137,7 +143,10 @@ def build(name: str, config: Dict[str, Any], runner: Any) -> Optional[Any]:
         )
 
     if name in {"complexity_blind", "complexity_blind_predictive", "blind_predictive"}:
-        from continuum_bench.controllers.conformal_controllers import ComplexityBlindPredictiveController
+        try:
+            from continuum_bench.controllers.conformal_controllers import ComplexityBlindPredictiveController
+        except ImportError:
+            from continuum_ext.controllers.conformal_controllers import ComplexityBlindPredictiveController
 
         cb_cfg = config.get("autoscaling", {}).get("complexity_blind", {})
         placement_cfg = config.get("placement", {})
@@ -152,7 +161,10 @@ def build(name: str, config: Dict[str, Any], runner: Any) -> Optional[Any]:
         )
 
     if name in {"conformal", "conformal_autoscaler"}:
-        from continuum_bench.controllers.conformal_controllers import ConformalAutoscalerController
+        try:
+            from continuum_bench.controllers.conformal_controllers import ConformalAutoscalerController
+        except ImportError:
+            from continuum_ext.controllers.conformal_controllers import ConformalAutoscalerController
 
         ca_cfg = config.get("autoscaling", {}).get("conformal", {})
         placement_cfg = config.get("placement", {})

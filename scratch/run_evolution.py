@@ -144,6 +144,13 @@ def validate_prerequisites():
         if not cfg.exists():
             errors.append(f"Missing suite config: {cfg}")
 
+    # Verify ContinuumBench can load controller extensions and 2D workloads
+    try:
+        from continuum_bench.controllers.extensions import build_extension_controller
+        from continuum_bench.workload import build_stream
+    except Exception as e:
+        errors.append(f"ContinuumBench extensions/workload integration failure: {e}")
+
     # Verify LLM API key is present in environment
     import os
     if not os.environ.get("GEMINI_API_KEY"):
@@ -211,9 +218,12 @@ AGENTS.md Compliance:
         with open(BEST_POLICY_OUTPUT, "w") as f:
             f.write(evolved_source)
 
+        cost_val = best.metrics.get("cost_savings", "N/A")
+        cost_str = f"{cost_val:.2f}%" if isinstance(cost_val, (int, float)) else str(cost_val)
+
         logger.info(f"Best policy exported to {BEST_POLICY_OUTPUT}")
         logger.info(f"  Fitness J: {fitness:.4f}")
-        logger.info(f"  Cost savings: {best.metrics.get('cost_savings', 'N/A'):.2f}%")
+        logger.info(f"  Cost savings: {cost_str}")
         logger.info(f"  Deadline misses: {best.metrics.get('deadline_misses', 'N/A')}")
 
     except Exception as e:
