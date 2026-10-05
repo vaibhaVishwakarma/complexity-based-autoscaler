@@ -1,0 +1,269 @@
+# openevolve_config_v2.yaml — Step 6 v2: OpenEvolve Evolutionary Policy Synthesis Configuration
+#
+# Role:
+#   Master configuration for the v2 OpenEvolve evolutionary search that synthesizes
+#   the Cost-First Conformal Autoscaler policy. Re-aligns objectives to drive cost
+#   savings as the primary metric, with equal, balanced penalties for deadline misses
+#   and P99 tail latency degradation, and secondary regularization for actuation churn.
+#
+# Gate Stage:   Step 6 v2 (OpenEvolve Evaluator & Fitness Engine)
+# Roadmap Ref:  docs/STEP6_OPENEVOLVE_SYNTHESIS_SPECIFICATION.md Sections 5, 6, 7
+# Strategy Ref: docs/CONFORMAL_AUTOSCALER_STRATEGY.md Section 9
+#
+# Objective Formulation (v2):
+#   J = cost_savings - (2.0 * min(M, 50) + 10.0 * max(0, M - 50)) - 10.0 * max(0.0, P99 - 5.0) - 0.01 * deltas
+#
+# Usage:
+#   Loaded by scratch/run_evolution_v2.py via openevolve.Config.from_yaml(path).
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOP-LEVEL EVOLUTION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Total evolution iterations (LLM → evaluate → archive cycles)
+max_iterations: 200
+
+# Checkpoint: save database state every N iterations for resumability
+checkpoint_interval: 1
+
+log_level: "INFO"
+
+# Reproducibility seed — matches simulation seeds (AGENTS.md Rule: SEED = 42)
+random_seed: 42
+
+# Python is the target language for the candidate policies
+language: "python"
+file_suffix: ".py"
+
+# ── Evolution Mode ─────────────────────────────────────────────────────────
+# diff_based_evolution: true — LLM generates SEARCH/REPLACE diffs modifying
+# the formula inside EVOLVE-BLOCK-START/END rather than full rewrites.
+diff_based_evolution: true
+
+# enforce_evolve_blocks: true — edits outside EVOLVE-BLOCK markers are reverted.
+enforce_evolve_blocks: true
+
+# Maximum candidate policy code length (chars) to prevent bloated policies.
+max_code_length: 25000
+
+# ── Early Stopping ─────────────────────────────────────────────────────────
+early_stopping_patience: 50
+convergence_threshold: 0.01
+early_stopping_metric: "combined_score"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  models:
+    - name: "gemini-3.5-flash-lite"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.6
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-flash-lite-latest"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.3
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-3-flash-preview"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.1
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMPT CONFIGURATION (V2 COST-FIRST DIRECTIVES)
+# ─────────────────────────────────────────────────────────────────────────────
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  include_artifacts: true
+  max_artifact_bytes: 10240
+  suggest_simplification_after_chars: 4000
+
+  # Island-specific system messages enforce distinct structural exploration styles
+  # while all aligning on the v2 Cost-First objective.
+  island_system_messages:
+    - |
+      You are an expert autoscaling researcher evolving the CORE CONFORMAL branch (Island 0).
+      Your primary mission: evolve a lean, mathematically optimal conformal autoscaling policy that MAXIMIZES COST SAVINGS while strictly managing tail risk.
+
+      V2 Fitness Objective:
+        J = cost_savings_% - miss_penalty - p99_penalty - churn_penalty
+        1. COST SAVINGS IS PRIMARY (+1.0 pt per 1% savings vs Fixed Capacity 27,900 ws).
+           Target: BEAT InferLine's 48.9% savings (14,261 worker-seconds)!
+        2. EQUAL BALANCED PENALTIES FOR MISSES AND P99:
+           - Miss penalty: 2.0 * min(misses, 50) + 10.0 * max(0, misses - 50)
+           - P99 penalty:  10.0 * max(0.0, p99_latency_s - 5.0s)
+           (10 misses = -20 pts; 2.0s P99 degradation = -20 pts -> Exact equal weight!)
+           CRITICAL INSIGHT: Low single-digit misses (e.g. <= 5 misses across 121k requests) under acute 15x bursts are COMPLETELY ACCEPTABLE if it unlocks 45-55% cost savings! Do NOT hoard defensive slack to achieve 0 misses at all costs!
+        3. ACTUATION CHURN IS SECONDARY (-0.01 pt per scaling delta).
+
+      Design Directives for Island 0:
+      - Causal cloud demand: state.offered_cloud_rps = ingress_rps * (1 - p_fast).
+      - Conformal safety multiplier: modulate headroom with state.mean_set_size, but keep multiplier tight (e.g. 1.0 to 1.15) to avoid over-provisioning.
+      - Fast queue drainage: drain small backlogs aggressively, but don't overreact to single-epoch blips.
+      - Only use state.* attributes defined in TelemetricState. No unauthorized imports. Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the CONTINUOUS COMPLEXITY DYNAMICS RADICAL (Island 1).
+      Your core mission: introduce predictive complexity velocity and acceleration factors to scale PREEMPTIVELY while drastically reducing idle worker-seconds.
+
+      V2 Fitness Objective:
+        J = cost_savings_% - miss_penalty - p99_penalty - churn_penalty
+        1. COST SAVINGS IS PRIMARY (+1.0 pt per 1% savings). Beat InferLine's 48.9% savings!
+        2. EQUAL BALANCED MISS & P99 WEIGHTS:
+           10 misses = -20 pts; 2.0s P99 latency increase = -20 pts.
+           Shed conservative capacity padding. A policy with 3-5 misses and 52% cost savings beats a 0-miss policy with 25% savings by over +20 fitness points!
+        3. ACTUATION CHURN IS SECONDARY (-0.01 pt per scaling delta).
+
+      Available dynamic signals in TelemetricState:
+      - state.p_fast_velocity: dp_fast/dt (<0 means complexity surging, >0 means relaxing)
+      - state.ingress_acceleration: d^2(lambda)/dt^2 indicating sudden ramp onset
+      - state.cloud_queue_velocity: dQ/dt differentiating transient spikes from sustained queues
+      - state.mean_set_size: E[|C(x)|] classification ambiguity
+
+      Design Directives for Island 1:
+      - Scale up aggressively ONLY when p_fast_velocity < -0.15 or ingress_acceleration > 20.0.
+      - Scale down promptly when complexity relaxes (p_fast_velocity > 0) to avoid wasting worker-seconds.
+      - Use velocity damping to prevent queue overshoot without adding static worker buffers.
+      - Only use state.* attributes defined in TelemetricState. Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the INFERLINE-CONFORMAL HYBRID RADICAL (Island 2).
+      Your core mission: start from InferLine's high cost efficiency (48.9% savings) and fix its semantic blindness using conformal triage signals!
+
+      V2 Fitness Objective:
+        J = cost_savings_% - miss_penalty - p99_penalty - churn_penalty
+        1. COST SAVINGS IS PRIMARY (+1.0 pt per 1% savings). Match or exceed InferLine's 48.9% savings (<= 14,261 ws)!
+        2. EQUAL BALANCED MISS & P99 WEIGHTS:
+           InferLine had 44 deadline misses and P99 of 6.0s (J_v2 = -57.66).
+           Step 7 Champion had 0 misses, P99 of 4.89s, but only 26% savings (J_v2 = +26.01).
+           YOUR TARGET: 48-52% savings, <= 4 misses, P99 <= 5.5s -> Fitness J > +35.0!
+        3. ACTUATION CHURN IS SECONDARY (-0.01 pt per scaling delta).
+
+      Design Directives for Island 2:
+      - Demand calculation: base worker sizing directly on state.offered_cloud_rps / mu.
+      - Queue drainage: queue_workers = ceil(cloud_queue_depth / drain_window).
+      - Fast-path collapse guard: add a small burst margin ONLY when state.p_fast drops rapidly.
+      - Asymmetric cooldown: allow immediate scale-up for sudden bursts, but enforce clean hysteresis on scale-down.
+      - Only use state.* attributes defined in TelemetricState. Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE CONFIGURATION (MAP-Elites Archive & Island Topology)
+# ─────────────────────────────────────────────────────────────────────────────
+
+database:
+  in_memory: false
+  db_path: "output/evolution_runs_v2/openevolve_db"
+
+  population_size: 500
+  archive_size: 100
+
+  # Asymmetric 3-branch island topology
+  num_islands: 3
+
+  elite_selection_ratio: 0.10
+  exploitation_ratio: 0.70
+  exploration_ratio: 0.20
+
+  # MAP-Elites Quality-Diversity Feature Dimensions
+  # Raw continuous values returned by evaluator:
+  #   cost_savings    = (1 - worker_seconds / 27900) * 100  (primary target: > 48.9%)
+  #   churn_stability = 2000.0 - scaling_deltas             (higher = less flapping)
+  #   tail_safety     = 15.0 - max_p99_latency_s            (higher = more SLA margin)
+  feature_dimensions:
+    - "cost_savings"
+    - "churn_stability"
+    - "tail_safety"
+  feature_bins: 10
+
+  migration_interval: 20
+  migration_rate: 0.10
+
+  random_seed: 42
+
+  log_prompts: true
+  enable_artifacts: true
+  cleanup_old_artifacts: false
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVALUATOR CONFIGURATION (Cascade Pipeline)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evaluator:
+  timeout: 300
+  cascade_evaluation: true
+  cascade_thresholds:
+    - 0.5
+    - 0.5
+
+  parallel_evaluations: 1
+  enable_artifacts: true
+  max_artifact_storage: 104857600  # 100MB
+  max_retries: 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVOLUTION TRACE LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+
+evolution_trace:
+  enabled: true
+  format: "jsonl"
+  include_code: true
+  include_prompts: true
+  output_path: "output/evolution_runs_v2/evolution_trace.jsonl"
+  buffer_size: 1
+  compress: false
