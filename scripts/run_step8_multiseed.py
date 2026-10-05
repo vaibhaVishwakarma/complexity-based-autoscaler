@@ -198,6 +198,41 @@ def execute_single_simulation(
     out_dir = out_root / ctrl_key / regime / f"seed_{seed}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # Resume check: Return cached results if run already completed successfully
+    run_dirs = sorted([d for d in out_dir.iterdir() if d.is_dir()])
+    if run_dirs:
+        summary_file = run_dirs[-1] / "summary.json"
+        if summary_file.exists():
+            try:
+                with open(summary_file) as f:
+                    data = json.load(f)
+                qos = data.get("qos", {})
+                cost = data.get("cost", {})
+                stability = data.get("stability", {})
+                latency = data.get("latency_s", {})
+                if qos.get("slo_eligible_count", 0) > 0:
+                    return {
+                        "controller": ctrl_name,
+                        "controller_key": ctrl_key,
+                        "regime": regime,
+                        "seed": seed,
+                        "status": "CACHED",
+                        "elapsed_s": 0.0,
+                        "completed_requests": qos.get("slo_eligible_count", 0),
+                        "deadline_misses": qos.get("deadline_miss_count", 0),
+                        "deadline_miss_rate": qos.get("deadline_miss_rate", 0.0),
+                        "worker_seconds": cost.get("total_provisioned_worker_seconds", 0.0),
+                        "mean_workers": cost.get("mean_active_workers", 0.0),
+                        "scaling_deltas": stability.get("scaling_delta_abs_total", 0.0),
+                        "mean_latency_s": latency.get("mean", 0.0),
+                        "p50_latency_s": latency.get("p50", 0.0),
+                        "p95_latency_s": latency.get("p95", 0.0),
+                        "p99_latency_s": latency.get("p99", 0.0),
+                        "max_latency_s": latency.get("max", latency.get("p99", 0.0)),
+                    }
+            except Exception:
+                pass
+
     env = {
         **os.environ,
         "PYTHONPATH": f"{WORKSPACE_ROOT}/src:{os.environ.get('PYTHONPATH', '')}",
@@ -479,14 +514,29 @@ def generate_statistical_markdown_report(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def parse_seed_list(seed_inputs: List[Any]) -> List[int]:
+    """Parse list of integers and range strings (e.g. ['1042-1062', '42'])."""
+    out = []
+    for item in seed_inputs:
+        s = str(item).strip()
+        if "-" in s and not s.startswith("-"):
+            parts = s.split("-", 1)
+            out.extend(range(int(parts[0]), int(parts[1]) + 1))
+        elif ".." in s:
+            parts = s.split("..", 1)
+            out.extend(range(int(parts[0]), int(parts[1]) + 1))
+        else:
+            out.append(int(s))
+    return sorted(list(set(out)))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Step 8: Multi-Seed Statistical Validation")
     parser.add_argument(
         "--seeds",
         nargs="+",
-        type=int,
-        default=DEFAULT_SEEDS,
-        help="List of random seeds to evaluate (default: 10 seeds)",
+        default=[str(s) for s in DEFAULT_SEEDS],
+        help="List of random seeds or range strings (e.g. 1042-1061) to evaluate",
     )
     parser.add_argument(
         "--regimes",
@@ -520,6 +570,9 @@ def main():
 
     args = parser.parse_args()
 
+    # Parse seeds (handles range syntax like 1042-1062)
+    resolved_seeds = parse_seed_list(args.seeds)
+
     # 1. Mandatory Pre-Flight Leakage Audit
     if not args.skip_audit:
         if not run_preflight_leakage_audit():
@@ -528,22 +581,23 @@ def main():
 
     out_dir: Path = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
+    summary_csv = out_dir / "multiseed_summary.csv"
 
     controller_map = dict(CONTROLLERS)
     selected_controllers = [(k, controller_map.get(k, k)) for k in args.controllers if k in controller_map]
 
-    total_tasks = len(args.regimes) * len(selected_controllers) * len(args.seeds)
+    total_tasks = len(args.regimes) * len(selected_controllers) * len(resolved_seeds)
     logger.info(f"Initiating Step 8 Multi-Seed Validation:")
     logger.info(f"  • Regimes:     {len(args.regimes)} ({', '.join(args.regimes[:3])}...)")
     logger.info(f"  • Controllers: {len(selected_controllers)} ({', '.join([k for k, _ in selected_controllers])})")
-    logger.info(f"  • Seeds:       {len(args.seeds)} ({args.seeds})")
+    logger.info(f"  • Seeds:       {len(resolved_seeds)} ({resolved_seeds[:3]}...{resolved_seeds[-1]})")
     logger.info(f"  • Total Runs:  {total_tasks} simulation tasks")
     logger.info(f"  • Concurrency: {args.workers} parallel workers")
     logger.info(f"  • Output Root: {out_dir}")
 
     # Build task list
     tasks = []
-    for seed in args.seeds:
+    for seed in resolved_seeds:
         for regime in args.regimes:
             for ctrl_key, ctrl_name in selected_controllers:
                 tasks.append((regime, ctrl_key, ctrl_name, seed, out_dir))
@@ -563,7 +617,7 @@ def main():
             results.append(res)
             completed_count += 1
 
-            if completed_count % 5 == 0 or completed_count == total_tasks:
+            if completed_count % 10 == 0 or completed_count == total_tasks:
                 elapsed = time.time() - start_time
                 rate = completed_count / elapsed if elapsed > 0 else 0
                 eta_s = (total_tasks - completed_count) / rate if rate > 0 else 0
@@ -574,13 +628,16 @@ def main():
                     f"Rate: {rate:.2f} runs/s | "
                     f"ETA: {eta_s/60:.1f} min"
                 )
+                try:
+                    pd.DataFrame(results).to_csv(summary_csv, index=False)
+                except Exception:
+                    pass
 
     total_elapsed = time.time() - start_time
     logger.info(f"All {total_tasks} runs completed in {total_elapsed/60:.2f} minutes.")
 
     # Convert to DataFrame
     df = pd.DataFrame(results)
-    summary_csv = out_dir / "multiseed_summary.csv"
     df.to_csv(summary_csv, index=False)
     logger.info(f"Saved complete run manifest to {summary_csv}")
 
