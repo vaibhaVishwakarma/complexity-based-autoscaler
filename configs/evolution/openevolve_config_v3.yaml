@@ -1,0 +1,240 @@
+# openevolve_config_v3.yaml — Step 6 v3: Cost-Supreme Evolutionary Search Configuration
+#
+# Role:
+#   Master configuration for the Step 7 v3 evolutionary search. Re-aligns objectives
+#   so that Cost Savings is supreme, establishing the P99 tail latency envelope at 6.0s
+#   (matching the InferLine tail SLA envelope and using only 40% of the 15.0s deadline budget).
+#   Promotes frugal policies achieving > 53% savings with zero deadline misses above
+#   overly-conservative balanced policies.
+#
+# Gate Stage:   Step 6 v3 (OpenEvolve Evaluator & Fitness Engine)
+# Roadmap Ref:  docs/STEP6_OPENEVOLVE_SYNTHESIS_SPECIFICATION.md
+# Strategy Ref: docs/CONFORMAL_AUTOSCALER_STRATEGY.md Section 9
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOP-LEVEL EVOLUTION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+max_iterations: 200
+checkpoint_interval: 1
+log_level: "INFO"
+random_seed: 42
+language: "python"
+file_suffix: ".py"
+
+diff_based_evolution: true
+enforce_evolve_blocks: true
+max_code_length: 25000
+
+early_stopping_patience: 50
+convergence_threshold: 0.01
+early_stopping_metric: "combined_score"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  models:
+    - name: "gemini-3.5-flash-lite"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.6
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-flash-lite-latest"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.3
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-3-flash-preview"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.1
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMPT CONFIGURATION (V3 COST-SUPREME DIRECTIVES)
+# ─────────────────────────────────────────────────────────────────────────────
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  include_artifacts: true
+  max_artifact_bytes: 10240
+  suggest_simplification_after_chars: 4000
+
+  island_system_messages:
+    - |
+      You are an expert autoscaling researcher evolving the CORE CONFORMAL branch (Island 0).
+      Your primary mission: evolve a lean, mathematically optimal conformal autoscaling policy that MAXIMIZES COST SAVINGS while strictly respecting the 15.0s SLA deadline.
+
+      V3 Fitness Objective:
+        J_v3 = cost_savings_% - miss_penalty - p99_penalty - churn_penalty
+        1. COST SAVINGS IS SUPREME (+1.0 pt per 1% savings vs Fixed Capacity 27,900 ws).
+           Your initial seed (Program 4a7ccfe9) already achieved 53.05% savings (13,100 ws) and 0 misses!
+           Target: Push beyond 53% towards 55% - 60% savings (< 12,500 worker-seconds)!
+        2. TAIL LATENCY ENVELOPE:
+           P99 penalty kicks in ONLY above 6.0s: 10.0 * max(0.0, p99_latency_s - 6.0s).
+           A P99 of 5.5s - 6.0s pays ZERO penalty, because the SLA deadline is 15.0s!
+           Do not hoard workers just to push P99 from 6.0s down to 5.0s — that wastes 1,800+ worker-seconds!
+        3. DEADLINE MISSES MUST REMAIN ZERO:
+           Miss penalty is harsh: 2.0 * min(M, 50) + 10.0 * max(0, M - 50).
+        4. CHURN PENALTY: 0.01 * deltas (keep actuation smooth).
+
+      Design Directives for Island 0:
+      - Continuous demand sizing before rounding: sum demand + drain as floats before applying ceil/int.
+      - Fractional booting credit: keep booting worker deduction high (e.g. 0.60 to 0.75 * booting_workers).
+      - Wider drain windows: DRAIN_WINDOW_S in [1.5s, 2.0s] prevents burst-overprovisioning.
+      - Asymmetric hysteresis: allow scale-down even with 1 queued request (cloud_queue_depth > 1).
+      - Only use state.* attributes defined in TelemetricState. No unauthorized imports. Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the CONTINUOUS COMPLEXITY DYNAMICS RADICAL (Island 1).
+      Your core mission: introduce predictive complexity velocity and acceleration factors to scale PREEMPTIVELY while drastically reducing idle worker-seconds.
+
+      V3 Fitness Objective:
+        J_v3 = cost_savings_% - miss_penalty - p99_penalty - churn_penalty
+        1. COST SAVINGS IS SUPREME (+1.0 pt per 1% savings). Beat the seed's 53.05% savings!
+        2. Tail latency up to 6.0s is penalty-free! P99 penalty = 10.0 * max(0.0, P99 - 6.0s).
+        3. Deadline misses must remain zero (harsh penalty for any miss).
+        4. Churn penalty: 0.01 * deltas.
+
+      Dynamic signals in TelemetricState:
+      - state.p_fast_velocity: dp_fast/dt (<0 means complexity surging, >0 means relaxing)
+      - state.ingress_acceleration: d^2(lambda)/dt^2 indicating sudden ramp onset
+      - state.cloud_queue_velocity: dQ/dt differentiating transient spikes from sustained queues
+      - state.mean_set_size: E[|C(x)|] classification ambiguity
+
+      Design Directives for Island 1:
+      - Scale down immediately when p_fast_velocity > 0 (complexity relaxing) to prune idle capacity.
+      - Use velocity damping on queue drain to absorb short 1-second bursts without spawning redundant workers.
+      - Modulate conformal headroom tightly: keep conformal multiplier close to 1.00 + 0.01 * (mean_set_size - 1.0).
+      - Only use state.* attributes defined in TelemetricState. Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the INFERLINE-CONFORMAL HYBRID RADICAL (Island 2).
+      Your core mission: take the proven 53% cost foundation and optimize its queuing parameters to achieve 55-60% cost savings!
+
+      V3 Fitness Objective:
+        J_v3 = cost_savings_% - miss_penalty - p99_penalty - churn_penalty
+        1. COST SAVINGS IS SUPREME (+1.0 pt per 1% savings).
+        2. Tail latency up to 6.0s has ZERO penalty. (SLA deadline is 15.0s).
+        3. Zero deadline misses.
+        4. Churn penalty: 0.01 * deltas.
+
+      Design Directives for Island 2:
+      - Demand calculation: base worker sizing on offered_cloud_rps / mu with minimal trend padding.
+      - Queue drainage: use a wide drain budget (DRAIN_WINDOW_S = 1.6s to 2.2s).
+      - Container credit: aggressively deduct in-flight booting workers (0.65 to 0.80 credit).
+      - Scale-down hysteresis: allow scale-down after 2.0s cooldown, tolerating cloud_queue_depth <= 1.
+      - Only use state.* attributes defined in TelemetricState. Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE CONFIGURATION (MAP-Elites Archive & Island Topology)
+# ─────────────────────────────────────────────────────────────────────────────
+
+database:
+  in_memory: false
+  db_path: "output/evolution_runs_v3/openevolve_db"
+
+  population_size: 500
+  archive_size: 100
+
+  num_islands: 3
+
+  elite_selection_ratio: 0.10
+  exploitation_ratio: 0.70
+  exploration_ratio: 0.20
+
+  feature_dimensions:
+    - "cost_savings"
+    - "churn_stability"
+    - "tail_safety"
+  feature_bins: 10
+
+  migration_interval: 20
+  migration_rate: 0.10
+
+  random_seed: 42
+
+  log_prompts: true
+  enable_artifacts: true
+  cleanup_old_artifacts: false
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVALUATOR CONFIGURATION (Cascade Pipeline)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evaluator:
+  timeout: 300
+  cascade_evaluation: true
+  cascade_thresholds:
+    - 0.5
+    - 0.5
+
+  parallel_evaluations: 1
+  enable_artifacts: true
+  max_artifact_storage: 104857600
+  max_retries: 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVOLUTION TRACE LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+
+evolution_trace:
+  enabled: true
+  format: "jsonl"
+  include_code: true
+  include_prompts: true
+  output_path: "output/evolution_runs_v3/evolution_trace.jsonl"
+  buffer_size: 1
+  compress: false

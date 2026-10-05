@@ -34,22 +34,38 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
-EVOLUTION_DIR = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
-DB_PROGRAMS_DIR = EVOLUTION_DIR / "openevolve_db" / "programs"
-TRACE_FILE = EVOLUTION_DIR / "evolution_trace.jsonl"
-OUTPUT_DIR = WORKSPACE_ROOT / "output" / "top20_variants"
-TARBALL_OUTPUT = WORKSPACE_ROOT / "top20_evolved_variants.tar.gz"
-
 FIXED_CAPACITY_WORKER_SECONDS = 27_900.0
 
 
-def load_programs_from_db() -> List[Dict[str, Any]]:
+def get_evolution_paths(version: str = "auto") -> tuple[Path, Path, Path, str]:
+    if version == "auto":
+        v3_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
+        v2_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
+        if (v3_dir / "openevolve_db").exists() or (v3_dir / "evolution_trace.jsonl").exists():
+            chosen_dir = v3_dir
+            ver_label = "v3 Cost-Supreme"
+        else:
+            chosen_dir = v2_dir
+            ver_label = "v2 Cost-First"
+    elif version in ("3", "v3"):
+        chosen_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
+        ver_label = "v3 Cost-Supreme"
+    else:
+        chosen_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
+        ver_label = "v2 Cost-First"
+
+    db_dir = chosen_dir / "openevolve_db" / "programs"
+    trace_file = chosen_dir / "evolution_trace.jsonl"
+    return chosen_dir, db_dir, trace_file, ver_label
+
+
+def load_programs_from_db(db_programs_dir: Path) -> List[Dict[str, Any]]:
     """Loads all evaluated programs from the MAP-Elites JSON files."""
     programs = []
-    if not DB_PROGRAMS_DIR.exists():
+    if not db_programs_dir.exists():
         return programs
 
-    for json_path in DB_PROGRAMS_DIR.glob("*.json"):
+    for json_path in db_programs_dir.glob("*.json"):
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -60,13 +76,13 @@ def load_programs_from_db() -> List[Dict[str, Any]]:
     return programs
 
 
-def load_programs_from_trace() -> List[Dict[str, Any]]:
+def load_programs_from_trace(trace_file: Path) -> List[Dict[str, Any]]:
     """Fallback: loads programs from evolution_trace.jsonl if DB directory is missing."""
     programs = []
-    if not TRACE_FILE.exists():
+    if not trace_file.exists():
         return programs
 
-    with open(TRACE_FILE, "r", encoding="utf-8") as f:
+    with open(trace_file, "r", encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue
@@ -88,18 +104,22 @@ def load_programs_from_trace() -> List[Dict[str, Any]]:
     return programs
 
 
-def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False):
+def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False, version: str = "auto"):
+    evolution_dir, db_programs_dir, trace_file, ver_label = get_evolution_paths(version)
+    output_dir = WORKSPACE_ROOT / "output" / "top20_variants"
+    tarball_output = WORKSPACE_ROOT / "top20_evolved_variants.tar.gz"
+
     print("=" * 70)
-    print(f" EXPORTING TOP {top_n} EVOLVED VARIANTS (Cost-First v2 Search)")
-    print(f" Source DB: {DB_PROGRAMS_DIR}")
-    print(f" Output Dir: {OUTPUT_DIR}")
+    print(f" EXPORTING TOP {top_n} EVOLVED VARIANTS ({ver_label})")
+    print(f" Source DB: {db_programs_dir}")
+    print(f" Output Dir: {output_dir}")
     print("=" * 70)
 
     # 1. Load candidate programs
-    programs = load_programs_from_db()
+    programs = load_programs_from_db(db_programs_dir)
     if not programs:
         print("  -> Notice: No programs found in openevolve_db. Loading from trace...")
-        programs = load_programs_from_trace()
+        programs = load_programs_from_trace(trace_file)
 
     if not programs:
         print("  ✗ ERROR: No evaluated programs found in database or trace.")
@@ -125,9 +145,9 @@ def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False):
     print(f"  ✓ Selected top {len(top_variants)} unique programs (highest fitness J_v2).")
 
     # 3. Create output directory
-    if OUTPUT_DIR.exists():
-        shutil.rmtree(OUTPUT_DIR)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # 4. Export each top variant as a standalone Python file
     leaderboard_rows = []
@@ -147,7 +167,7 @@ def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False):
         # Format clean filename: rank01_fit+26.01_id085265b3.py
         score_tag = f"{score:+.2f}".replace(".", "p")
         filename = f"rank{rank:02d}_fit{score_tag}_id{pid_short}.py"
-        file_path = OUTPUT_DIR / filename
+        file_path = output_dir / filename
 
         provenance_header = f'''"""
 Policy Rank:        #{rank} of {len(top_variants)}
@@ -186,20 +206,20 @@ Mutation Rationale:
         })
 
     # 5. Write Leaderboard CSV
-    csv_path = OUTPUT_DIR / "TOP20_LEADERBOARD.csv"
+    csv_path = output_dir / "TOP20_LEADERBOARD.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(leaderboard_rows[0].keys()))
         writer.writeheader()
         writer.writerows(leaderboard_rows)
 
     # 6. Write Leaderboard Markdown
-    md_path = OUTPUT_DIR / "TOP20_LEADERBOARD.md"
+    md_path = output_dir / "TOP20_LEADERBOARD.md"
     md_lines = [
-        f"# Top {len(top_variants)} Discovered Autoscaling Policies (v2 Cost-First Search)",
+        f"# Top {len(top_variants)} Discovered Autoscaling Policies ({ver_label})",
         "",
-        "Objective: $J_{\\text{v2}} = \\text{cost\\_savings\\_\\%} - \\left(2.0 \\cdot \\min(M, 50) + 10.0 \\cdot \\max(0, M - 50)\\right) - 10.0 \\cdot \\max(0.0, P99 - 5.0) - 0.01 \\cdot \\Delta$",
+        "Objective: $J = \\text{cost\\_savings\\_\\%} - \\left(2.0 \\cdot \\min(M, 50) + 10.0 \\cdot \\max(0, M - 50)\\right) - 10.0 \\cdot \\max(0.0, P99 - \\text{threshold}) - 0.01 \\cdot \\Delta$",
         "",
-        "| Rank | File | Program ID | Fitness $J_{\\text{v2}}$ | Cost Savings | Worker-Sec | Misses | Max P99 | Deltas | Status |",
+        "| Rank | File | Program ID | Fitness $J$ | Cost Savings | Worker-Sec | Misses | Max P99 | Deltas | Status |",
         "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
     for r in leaderboard_rows:
@@ -211,41 +231,43 @@ Mutation Rationale:
     with open(md_path, "w", encoding="utf-8") as f:
         f.write("\n".join(md_lines))
 
-    print(f"  ✓ Exported {len(top_variants)} policies into {OUTPUT_DIR}")
+    print(f"  ✓ Exported {len(top_variants)} policies into {output_dir}")
     print(f"  ✓ Created {csv_path.name} and {md_path.name}")
 
     # 7. Copy auxiliary lightweight reporting files if they exist
     aux_files = [
+        WORKSPACE_ROOT / "output" / "evolved_policy_v3.py",
         WORKSPACE_ROOT / "output" / "evolved_policy_v2.py",
+        WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V3.md",
         WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V2.md",
-        EVOLUTION_DIR / "algorithm_performance_log.csv",
-        EVOLUTION_DIR / "llm_calls_log.csv",
-        EVOLUTION_DIR / "evolution_trace.jsonl",
+        evolution_dir / "algorithm_performance_log.csv",
+        evolution_dir / "llm_calls_log.csv",
+        evolution_dir / "evolution_trace.jsonl",
     ]
     for af in aux_files:
         if af.exists():
-            shutil.copy(str(af), str(OUTPUT_DIR / af.name))
+            shutil.copy(str(af), str(output_dir / af.name))
             print(f"  ✓ Bundled auxiliary file: {af.name}")
 
     # 8. Create compressed tarball (< 2MB)
-    with tarfile.open(TARBALL_OUTPUT, "w:gz") as tar:
-        tar.add(str(OUTPUT_DIR), arcname="top20_variants")
+    with tarfile.open(tarball_output, "w:gz") as tar:
+        tar.add(str(output_dir), arcname="top20_variants")
 
-    tar_size_kb = TARBALL_OUTPUT.stat().st_size / 1024
+    tar_size_kb = tarball_output.stat().st_size / 1024
     tar_size_mb = tar_size_kb / 1024
     size_str = f"{tar_size_mb:.2f} MB" if tar_size_mb >= 1.0 else f"{tar_size_kb:.1f} KB"
     print("=" * 70)
     print(f" PACKAGING COMPLETE!")
-    print(f"  Output Tarball: {TARBALL_OUTPUT}")
+    print(f"  Output Tarball: {tarball_output}")
     print(f"  Tarball Size:   {size_str} (bypassed 18GB of temporary simulation logs!)")
     print("=" * 70)
 
     # 9. Optional: Clean disposable simulation logs if requested
-    if clean_sim_logs:
-        print("\n[CLEANUP] Cleaning temporary simulation directories in evolution_runs_v2...")
+    if clean_sim_logs and evolution_dir.exists():
+        print(f"\n[CLEANUP] Cleaning temporary simulation directories in {evolution_dir.name}...")
         freed_bytes = 0
-        for item in EVOLUTION_DIR.iterdir():
-            if item.is_dir() and (item.name.startswith("tmp") or item.name == "seed_policy_v2"):
+        for item in evolution_dir.iterdir():
+            if item.is_dir() and (item.name.startswith("tmp") or item.name.startswith("seed_policy")):
                 try:
                     size = sum(f.stat().st_size for f in item.glob("**/*") if f.is_file())
                     shutil.rmtree(str(item), ignore_errors=True)
@@ -260,6 +282,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export top discovered policies into a lightweight tarball.")
     parser.add_argument("--top", type=int, default=20, help="Number of top variants to export (default: 20)")
     parser.add_argument("--clean-sim-logs", action="store_true", help="Delete disposable tmp* simulation folders to free disk space")
+    parser.add_argument("--version", type=str, default="auto", choices=["auto", "2", "v2", "3", "v3"], help="Run version to export (default: auto)")
     args = parser.parse_args()
 
-    export_top_variants(top_n=args.top, clean_sim_logs=args.clean_sim_logs)
+    export_top_variants(top_n=args.top, clean_sim_logs=args.clean_sim_logs, version=args.version)
