@@ -524,3 +524,189 @@ With Step 7 successfully concluded, the Conformal Autoscaler research pipeline t
 ```
 
 **Sign-off**: Step 7 is officially declared **COMPLETE**. The discovered variations stand as the definitive policy candidates for empirical validation.
+
+
+---
+
+## Appendix A: Mathematical Comparison of Top-5 Evolved Scaling Laws
+
+To facilitate rigorous comparative analysis and sensitivity profiling for Gate 8, this appendix provides a complete mathematical specification of the **Top 5 distinct algorithmic variations** discovered during the Step 7 evolutionary search. All five policies achieved **$0$ deadline misses** and **5.00s P99 latency** across all 13 ContinuumBench regimes (121,134 requests).
+
+### A.1 Top-5 Architectural Comparison Matrix
+
+| Rank & Policy ID | Island Origin & Iteration | Fitness $J$ | Deadline Misses | Worker-Seconds ($\sum k_t \Delta t$) | Cost Savings (%) | Actuation Churn ($\sum |\Delta k|$) | Max P99 Latency | Architectural Taxonomy & Primary Mechanism |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **#1**<br>`35671429` | **Island 0**<br>(Iter 103) | **1152.5520** | **0** | **19,544.0** | **29.95%** | 394 | 5.000s | **Conformal Demand-Forward with Uncertainty Adaptation**<br>Tightened conformal factor ($1.08 + 0.08|\mathcal{C}|$), 550ms drain, 50% boot discount, 2.5s asymmetric scale-down cooldown with queue lock. |
+| **#2**<br>`70c5ec11` | **Island 2**<br>(Iter 96) | **1150.2560** | **0** | **20,692.0** | **25.84%** | 394 | 5.000s | **Pre-Ceil Fleet Synthesis with Proportional SLA Rescue**<br>Continuous conformal headroom ($1.15 + 0.15|\mathcal{C}| + 0.40|\dot{p}_{\text{fast}}|$), velocity-clamped drain (600ms), provisioned-reference model, 2-tier rescue ($t_{\text{age}} > 8\text{s}, 12\text{s}$). |
+| **#3**<br>`9137e41e` | **Island 0**<br>(Iter 94 & 100) | **1150.0740** | **0** | **20,583.0** | **26.23%** | 402 | 5.000s | **Conformal Demand-Forward with Ingress Acceleration**<br>Intermediate conformal factor ($1.10 + 0.10|\mathcal{C}|$), explicit second-derivative surge ($0.15 \cdot \ddot{\lambda}_{\text{ingress}}$), 550ms drain, 3.0s asymmetric cooldown. |
+| **#4**<br>`27f02192` | **Island 2**<br>(Iter 102 & 108) | **1149.9740** | **0** | **20,833.0** | **25.33%** | 394 | 5.000s | **Calibrated Continuous Headroom & Velocity Dampening**<br>Fine-tuned continuous factor ($1.18 + 0.15|\mathcal{C}| + 0.38|\dot{p}_{\text{fast}}|$), surge factor ($0.25 \cdot \ddot{\lambda}$), 650ms drain with $\kappa_{\text{vel}}=0.42$, 4.0s cooldown with queue lock. |
+| **#5**<br>`c3845087` | **Island 2**<br>(Iter 72 & 84) | **1149.8300** | **0** | **20,955.0** | **24.89%** | **392** | 5.000s | **Provisioned-Reference Model with Maximum Churn Damping**<br>Extended 700ms drain window, surge factor ($0.30 \cdot \ddot{\lambda}$), strict provisioned fleet anchoring ($k_{\text{prov}} = k_{\text{active}} + k_{\text{boot}}$), achieving global minimum churn (392 deltas). |
+
+---
+
+### A.2 Mathematical Specifications of Each Scaling Law
+
+```
+Common Parameters & Physical Constants:
+  • mu = 16.0 RPS/worker (Tesla T4 service rate, Gate 2 profiled)
+  • max_workers = 18 (6 cloud nodes × 3 workers/node)
+  • D = 15.0 seconds (End-to-end SLA deadline)
+```
+
+#### Policy #1: Program `35671429-9085-4ec6-abdd-9ddebc56f15f` (Global Champion)
+*Origin: Island 0 (Core Conformal Branch), Iteration 103*
+
+1. **Conformal Demand-Forward Term**:
+   $$c_{\text{safety}} = 1.08 + 0.08 \cdot \max(0, \, |\mathcal{C}_t| - 1.0)$$
+   $$\lambda_{\text{trend}} = \max\left(0, -\frac{d p_{\text{fast}}}{dt}\right) \cdot \lambda_{\text{ingress}}$$
+   $$\lambda_{\text{anticipated}} = \lambda_{\text{cloud}} + \lambda_{\text{trend}}$$
+   $$k_{\text{demand}} = \left\lceil \frac{\lambda_{\text{anticipated}} \cdot c_{\text{safety}}}{\mu} \right\rceil$$
+
+2. **Queue Drain Term with Velocity Damping**:
+   $$Q_{\text{adj}} = \max\left(0, \, Q_t + 0.35 \cdot \max(0, \dot{Q}_t)\right)$$
+   $$k_{\text{drain}} = \left\lceil \frac{Q_{\text{adj}} / 0.55\text{s}}{\mu} \right\rceil$$
+
+3. **In-Flight Booting Discount & Asymmetric Hysteresis**:
+   $$k_{\text{raw}} = k_{\text{demand}} + k_{\text{drain}} - \lfloor 0.5 \cdot k_{\text{boot}} \rfloor$$
+   $$k_t = \begin{cases} 
+   k_{\text{active}} & \text{if } k_{\text{raw}} < k_{\text{active}} \text{ and } \big(\Delta t_{\text{scale}} < 2.5\text{s} \text{ or } Q_t > 0\big) \\
+   k_{\text{raw}} & \text{otherwise}
+   \end{cases}$$
+   $$k_t \leftarrow \text{Clamp}(k_t, 1, 18)$$
+
+---
+
+#### Policy #2: Program `70c5ec11-b54e-4773-b178-7d71fac95b72` (InferLine-Conformal Hybrid)
+*Origin: Island 2 (InferLine-Conformal Hybrid Radical), Iteration 96*
+
+1. **Continuous Semantic-Aware Demand (RPS)**:
+   $$c_{\text{factor}} = 1.15 + 0.15 \cdot \max(0, \, |\mathcal{C}_t| - 1.0) + 0.40 \cdot \max\left(0, -\frac{d p_{\text{fast}}}{dt}\right)$$
+   $$\lambda_{\text{demand}} = \lambda_{\text{cloud}} \cdot c_{\text{factor}}$$
+   $$\lambda_{\text{surge}} = 0.20 \cdot \max\left(0, \, \frac{d^2\lambda_{\text{ingress}}}{dt^2}\right)$$
+
+2. **Velocity-Clamped Queue Drain (RPS)**:
+   $$\dot{Q}_{\text{clamped}} = \max(-10.0, \, \min(20.0, \, \dot{Q}_t))$$
+   $$\lambda_{\text{drain}} = \frac{Q_t + 0.45 \cdot \dot{Q}_{\text{clamped}}}{0.60\text{s}}$$
+
+3. **Pre-Ceil Fleet Aggregation & Provisioned Reference**:
+   $$k_{\text{desired}} = \left\lceil \frac{\lambda_{\text{demand}} + \lambda_{\text{surge}} + \max(0, \lambda_{\text{drain}})}{\mu} \right\rceil$$
+   $$k_{\text{prov}} = k_{\text{active}} + k_{\text{boot}}$$
+   $$k_{\text{target}} = \begin{cases}
+   k_{\text{active}} & \text{if } k_{\text{desired}} < k_{\text{active}} \text{ and } \big(\Delta t_{\text{scale}} < 3.5\text{s} \text{ or } Q_t > 0\big) \\
+   k_{\text{prov}} & \text{elif } k_{\text{desired}} \le k_{\text{prov}} \\
+   k_{\text{desired}} & \text{otherwise}
+   \end{cases}$$
+
+4. **Multi-Stage Proportional SLA Rescue**:
+   $$\text{if } t_{\text{age}} > 8.0\text{s and } Q_t > 0 \implies k_{\text{target}} \leftarrow \max(k_{\text{target}}, \, k_{\text{prov}} + 1)$$
+   $$\text{if } t_{\text{age}} > 12.0\text{s and } Q_t > 0 \implies k_{\text{target}} \leftarrow \max(k_{\text{target}}, \, k_{\text{active}} + 4)$$
+   $$k_t \leftarrow \text{Clamp}(k_{\text{target}}, 1, 18)$$
+
+---
+
+#### Policy #3: Program `9137e41e-1a6c-47d1-b961-064b55db3a73` (Acceleration-Aware Conformal)
+*Origin: Island 0 (Core Conformal Branch), Iteration 94 & 100*
+
+1. **Demand-Forward Term with Acceleration Headroom**:
+   $$c_{\text{safety}} = 1.10 + 0.10 \cdot \max(0, \, |\mathcal{C}_t| - 1.0)$$
+   $$\lambda_{\text{trend}} = \max\left(0, -\frac{d p_{\text{fast}}}{dt}\right) \cdot \lambda_{\text{ingress}}$$
+   $$\lambda_{\text{anticipated}} = \lambda_{\text{cloud}} + \lambda_{\text{trend}} + 0.15 \cdot \max\left(0, \, \frac{d^2\lambda_{\text{ingress}}}{dt^2}\right)$$
+   $$k_{\text{demand}} = \left\lceil \frac{\lambda_{\text{anticipated}} \cdot c_{\text{safety}}}{\mu} \right\rceil$$
+
+2. **Queue Drain Term**:
+   $$Q_{\text{adj}} = Q_t + 0.35 \cdot \max(0, \dot{Q}_t)$$
+   $$k_{\text{drain}} = \left\lceil \frac{\max(0, Q_{\text{adj}}) / 0.55\text{s}}{\mu} \right\rceil$$
+
+3. **Asymmetric Cooldown & Booting Offset**:
+   $$k_{\text{raw}} = k_{\text{demand}} + k_{\text{drain}} - \lfloor 0.5 \cdot k_{\text{boot}} \rfloor$$
+   $$k_t = \begin{cases}
+   k_{\text{active}} & \text{if } k_{\text{raw}} < k_{\text{active}} \text{ and } \big(\Delta t_{\text{scale}} < 3.0\text{s} \text{ or } Q_t > 0\big) \\
+   k_{\text{raw}} & \text{otherwise}
+   \end{cases}$$
+   $$k_t \leftarrow \text{Clamp}(k_t, 1, 18)$$
+
+---
+
+#### Policy #4: Program `27f02192-b8d0-4566-80bf-c013e811440a` (Calibrated Continuous Headroom)
+*Origin: Island 2 (InferLine-Conformal Hybrid Radical), Iteration 102 & 108*
+
+1. **Continuous Semantic Demand (RPS)**:
+   $$c_{\text{factor}} = 1.18 + 0.15 \cdot \max(0, \, |\mathcal{C}_t| - 1.0) + 0.38 \cdot \max\left(0, -\frac{d p_{\text{fast}}}{dt}\right)$$
+   $$\lambda_{\text{demand}} = \lambda_{\text{cloud}} \cdot c_{\text{factor}}$$
+   $$\lambda_{\text{surge}} = 0.25 \cdot \max\left(0, \, \frac{d^2\lambda_{\text{ingress}}}{dt^2}\right)$$
+
+2. **Refined Velocity-Clamped Queue Drain**:
+   $$\dot{Q}_{\text{clamped}} = \max(-10.0, \, \min(20.0, \, \dot{Q}_t))$$
+   $$\lambda_{\text{drain}} = \frac{Q_t + 0.42 \cdot \dot{Q}_{\text{clamped}}}{0.65\text{s}}$$
+
+3. **Provisioned Reference & Proportional Escalation**:
+   $$k_{\text{desired}} = \left\lceil \frac{\lambda_{\text{demand}} + \lambda_{\text{surge}} + \max(0, \lambda_{\text{drain}})}{\mu} \right\rceil$$
+   $$k_{\text{prov}} = k_{\text{active}} + k_{\text{boot}}$$
+   $$k_{\text{target}} = \begin{cases}
+   k_{\text{active}} & \text{if } k_{\text{desired}} < k_{\text{active}} \text{ and } \big(\Delta t_{\text{scale}} < 4.0\text{s} \text{ or } Q_t > 0\big) \\
+   k_{\text{prov}} & \text{elif } k_{\text{desired}} \le k_{\text{prov}} \\
+   k_{\text{desired}} & \text{otherwise}
+   \end{cases}$$
+   $$\text{if } t_{\text{age}} > 8.0\text{s and } Q_t > 0 \implies k_{\text{target}} \leftarrow \max(k_{\text{target}}, \, k_{\text{prov}} + 1)$$
+   $$\text{if } t_{\text{age}} > 12.0\text{s and } Q_t > 0 \implies k_{\text{target}} \leftarrow \max(k_{\text{target}}, \, k_{\text{active}} + 4)$$
+   $$k_t \leftarrow \text{Clamp}(k_{\text{target}}, 1, 18)$$
+
+---
+
+#### Policy #5: Program `c3845087-4aeb-4060-ae1a-5e05ec8cb72e` (Minimal Churn Anchor)
+*Origin: Island 2 (InferLine-Conformal Hybrid Radical), Iteration 72 & 84*
+
+1. **High-Headroom Semantic Demand (RPS)**:
+   $$c_{\text{factor}} = 1.20 + 0.15 \cdot \max(0, \, |\mathcal{C}_t| - 1.0) + 0.40 \cdot \max\left(0, -\frac{d p_{\text{fast}}}{dt}\right)$$
+   $$\lambda_{\text{demand}} = \lambda_{\text{cloud}} \cdot c_{\text{factor}}$$
+   $$\lambda_{\text{surge}} = 0.30 \cdot \max\left(0, \, \frac{d^2\lambda_{\text{ingress}}}{dt^2}\right)$$
+
+2. **Extended Queue Drain Window (700ms)**:
+   $$\dot{Q}_{\text{clamped}} = \max(-10.0, \, \min(20.0, \, \dot{Q}_t))$$
+   $$\lambda_{\text{drain}} = \frac{Q_t + 0.45 \cdot \dot{Q}_{\text{clamped}}}{0.70\text{s}}$$
+
+3. **Provisioned Fleet Anchoring (Minimum Churn Pioneer)**:
+   $$k_{\text{desired}} = \left\lceil \frac{\lambda_{\text{demand}} + \lambda_{\text{surge}} + \max(0, \lambda_{\text{drain}})}{\mu} \right\rceil$$
+   $$k_{\text{prov}} = k_{\text{active}} + k_{\text{boot}}$$
+   $$k_{\text{target}} = \begin{cases}
+   k_{\text{active}} & \text{if } k_{\text{desired}} < k_{\text{active}} \text{ and } \big(\Delta t_{\text{scale}} < 4.0\text{s} \text{ or } Q_t > 0\big) \\
+   k_{\text{prov}} & \text{elif } k_{\text{desired}} \le k_{\text{prov}} \\
+   k_{\text{desired}} & \text{otherwise}
+   \end{cases}$$
+   $$\text{if } t_{\text{age}} > 8.0\text{s and } Q_t > 0 \implies k_{\text{target}} \leftarrow \max(k_{\text{target}}, \, k_{\text{prov}} + 1)$$
+   $$\text{if } t_{\text{age}} > 12.0\text{s and } Q_t > 0 \implies k_{\text{target}} \leftarrow \max(k_{\text{target}}, \, k_{\text{active}} + 4)$$
+   $$k_t \leftarrow \text{Clamp}(k_{\text{target}}, 1, 18)$$
+
+---
+
+### A.3 Comparative Hyperparameter Sensitivity Matrix
+
+The following matrix compares how each top-5 variation tuned the core mathematical parameters:
+
+| Mathematical Parameter | Symbol | Policy #1 (`35671429`) | Policy #2 (`70c5ec11`) | Policy #3 (`9137e41e`) | Policy #4 (`27f02192`) | Policy #5 (`c3845087`) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Base Conformal Multiplier** | $\alpha_0$ | **1.08** | 1.15 | 1.10 | 1.18 | 1.20 |
+| **Set Size Sensitivity** | $\beta_{\text{set}}$ | 0.08 | 0.15 | 0.10 | 0.15 | 0.15 |
+| **Semantic Drift Sensitivity** | $\gamma_{\text{drift}}$ | $1.00 \cdot \lambda_{\text{ing}}$ | 0.40 | $1.00 \cdot \lambda_{\text{ing}}$ | 0.38 | 0.40 |
+| **Ingress Acceleration Weight** | $\delta_{\text{accel}}$ | 0.00 (implicit) | 0.20 | 0.15 | 0.25 | 0.30 |
+| **Queue Drain Window** | $\tau_{\text{drain}}$ | **0.55s** | 0.60s | 0.55s | 0.65s | **0.70s** |
+| **Queue Velocity Weight** | $\kappa_{\text{vel}}$ | 0.35 | 0.45 | 0.35 | 0.42 | 0.45 |
+| **Velocity Clamp Bounds** | $[\dot{Q}_{\min}, \dot{Q}_{\max}]$ | $[0, \infty)$ | $[-10, 20]$ | $[0, \infty)$ | $[-10, 20]$ | $[-10, 20]$ |
+| **Booting Worker Discount** | $\rho_{\text{boot}}$ | **50% subtract** | Provisioned Ref | **50% subtract** | Provisioned Ref | Provisioned Ref |
+| **Scale-Down Cooldown** | $t_{\text{cooldown}}$ | **2.5s** | 3.5s | 3.0s | 4.0s | **4.0s** |
+| **Backlog Lock Condition** | $Q_t > 0$ | **Yes (Hold)** | **Yes (Hold)** | **Yes (Hold)** | **Yes (Hold)** | **Yes (Hold)** |
+| **SLA Rescue Trigger** | $t_{\text{rescue}}$ | Proportional | Multi-stage (8s/12s) | Proportional | Multi-stage (8s/12s) | Multi-stage (8s/12s) |
+| **Resulting Worker-Seconds** | $\sum k_t \Delta t$ | **19,544.0** | 20,692.0 | 20,583.0 | 20,833.0 | 20,955.0 |
+| **Resulting Actuation Churn** | $\sum |\Delta k|$ | 394 | 394 | 402 | 394 | **392** |
+
+### A.4 Architectural Takeaways from the Top-5 Variations
+1. **The Cost vs Churn Trade-off Frontier**:
+   - Policy #1 (Island 0 Champion) represents the **Pareto Cost Optimum** ($19,544.0$ worker-seconds) by trimming $\alpha_0$ to $1.08$ and $\tau_{\text{drain}}$ to $0.55$s while maintaining 394 deltas.
+   - Policy #5 (Island 2 Anchor) represents the **Pareto Actuation Stability Optimum** ($392$ deltas) by lengthening the drain window to $0.70$s and maintaining a $4.0$s cooldown at the expense of $1,411$ additional worker-seconds ($20,955.0$ ws).
+2. **The Universal Invariant: The Backlog Lock ($Q_t > 0$)**:
+   - All five top-performing policies independently discovered and preserved the condition:
+     $$\text{Hold active capacity if } Q_t > 0$$
+   - This simple, deterministic rule was the single most impactful structural innovation in preventing the "HPA Drain Drop" and eliminating deadline misses during transient burst decays.
+3. **Discrete Ceil vs Pre-Ceil Fleet Aggregation**:
+   - Island 0 computed intermediate worker ceilings for demand and drain ($k_{\text{demand}} + k_{\text{drain}}$).
+   - Island 2 summed the continuous RPS demands first ($\lambda_{\text{total}} = \lambda_{\text{demand}} + \lambda_{\text{surge}} + \lambda_{\text{drain}}$) before a single ceiling operation $\lceil \lambda_{\text{total}} / \mu \rceil$, effectively smoothing out rounding errors during low-amplitude oscillations.
