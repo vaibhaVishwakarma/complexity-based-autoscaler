@@ -60,3 +60,5 @@ clones/
 .vscode/
 *.swp
 *.swo
+
+/paper-template/
