@@ -46,7 +46,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Step8v3Stats")
 
-DEFAULT_INPUT_DIR = Path("/home/vaibo/edgecompute/output/step8_multiseed_runs_v3")
+WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_INPUT_DIR = WORKSPACE_ROOT / "output" / "step8_multiseed_runs_v3"
+DEFAULT_DOCS_PATH = WORKSPACE_ROOT / "docs" / "STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md"
 
 CONTROLLER_LABELS = {
     "evolved_conformal": "Evolved Conformal v3 (Champion bbd9b1c2)",
@@ -166,17 +168,19 @@ def generate_markdown_report(
     seeds_list = sorted(summary_df["seed"].unique().tolist())
     regimes_list = sorted(summary_df["regime"].unique().tolist())
     total_runs = len(summary_df)
+    phase_title = f"Phase 1: {len(seeds_list)}-Seed Empirical Preview" if len(seeds_list) <= 3 else f"Phase 2: {len(seeds_list)}-Seed Full Validation"
 
     lines = [
-        "# Step 8 v3 Execution Report: Multi-Seed Statistical Validation & Hypothesis Testing",
+        f"# Step 8 v3 Statistical Validation & Hypothesis Testing ({phase_title})",
         "",
-        "**Document Role**: Definitive publication-grade statistical verification certifying the empirical superiority and distribution-shift resilience of Evolved Conformal Policy v3 across independent stochastic realizations.",
+        "**Document Role**: Authoritative publication-grade statistical verification certifying the empirical superiority and distribution-shift resilience of Evolved Conformal Policy v3 across independent stochastic realizations.",
         "**Execution Milestone**: Step 8 v3 of the [Unified Conformal Autoscaling Strategy](file:///home/vaibo/edgecompute/docs/CONFORMAL_AUTOSCALER_STRATEGY.md#12-chronological-execution-roadmap-and-verification-checklist).",
         f"**Date Generated**: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
         f"**Evaluated Champion**: `bbd9b1c2` ([`output/evolved_policy_v3.py`](file:///home/vaibo/edgecompute/output/evolved_policy_v3.py))",
-        f"**Evaluated Seeds (N={len(seeds_list)})**: `{seeds_list}`",
+        f"**Evaluated Stochastic Seeds (N={len(seeds_list)})**: `{seeds_list}`",
         f"**Evaluated Regimes (R={len(regimes_list)})**: `{regimes_list}`",
-        f"**Total Evaluated Runs**: `{total_runs:,}` runs",
+        f"**Total Simulation Runs**: `{total_runs:,}` runs",
+        f"**Status**: {'✅ Phase 1 Preview Complete — Review before 20-seed extension' if len(seeds_list) <= 3 else '✅ Full Multi-Seed Validation Complete'}",
         "",
         "---",
         "",
@@ -266,6 +270,7 @@ def generate_markdown_report(
 def main():
     parser = argparse.ArgumentParser(description="Step 8 v3: Statistical Processing & Hypothesis Testing Engine")
     parser.add_argument("--input-dir", type=str, default=str(DEFAULT_INPUT_DIR), help="Directory containing multiseed_summary.csv")
+    parser.add_argument("--docs-report", type=str, default=str(DEFAULT_DOCS_PATH), help="Path to write documentation markdown report")
     args = parser.parse_args()
 
     input_dir = Path(args.input_dir).resolve()
@@ -298,9 +303,17 @@ def main():
     report_path = input_dir / "statistical_report.md"
     report_content = generate_markdown_report(df, hypothesis_results, report_path)
 
+    # Synchronize directly to docs/ folder for immediate reference
+    docs_path = Path(args.docs_report).resolve()
+    docs_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(docs_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+    logger.info(f"Synchronized docs report to: {docs_path}")
+
     print("\n" + "=" * 80)
     print("STEP 8 V3 STATISTICAL PROCESSING COMPLETE")
     print(f"Summary Report: {report_path}")
+    print(f"Docs Report:    {docs_path}")
     print(f"Tests JSON:     {json_path}")
     print("=" * 80)
 

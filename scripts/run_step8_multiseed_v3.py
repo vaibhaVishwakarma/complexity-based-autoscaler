@@ -100,7 +100,8 @@ CONTROLLERS = [
     ("keda", "KEDA Queue (Backlog=5)"),
 ]
 
-DEFAULT_SEEDS = [42, 101, 202, 303, 404, 505, 606, 707, 808, 909]
+DEFAULT_SEEDS = [42, 101, 202]  # Phase 1: 3 seeds (42 calibration + 101, 202 evaluation)
+FULL_20_SEEDS = list(range(1042, 1062))  # Phase 2: 20 seeds for full validation
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -330,7 +331,8 @@ def parse_seed_list(seed_inputs: List[Any]) -> List[int]:
 
 def main():
     parser = argparse.ArgumentParser(description="Step 8 v3: Multi-Seed Statistical Validation Runner")
-    parser.add_argument("--seeds", nargs="+", default=[str(s) for s in DEFAULT_SEEDS], help="List of seeds or range e.g. 1042-1061")
+    parser.add_argument("--preset", choices=["3seed", "20seed"], default="3seed", help="Seed preset: 3seed (Phase 1 preview) or 20seed (Phase 2 full)")
+    parser.add_argument("--seeds", nargs="+", default=None, help="Explicit list of seeds or range e.g. 1042-1061")
     parser.add_argument("--regimes", nargs="+", default=ALL_REGIMES, help="List of regimes to evaluate")
     parser.add_argument("--controllers", nargs="+", default=[k for k, _ in CONTROLLERS], help="Controllers to benchmark")
     parser.add_argument("--workers", type=int, default=min(8, os.cpu_count() or 4), help="Parallel subprocess workers")
@@ -338,6 +340,7 @@ def main():
     parser.add_argument("--output-dir", type=str, default=str(DEFAULT_OUTPUT_DIR), help="Output directory for all runs")
     parser.add_argument("--force", action="store_true", help="Force re-run even if cached")
     parser.add_argument("--smoke", action="store_true", help="Execute 1 iteration smoke test (1 regime, 1 seed, 2 controllers)")
+    parser.add_argument("--no-auto-process", action="store_true", help="Do not automatically run statistical processing")
 
     args = parser.parse_args()
     champion_path = Path(args.candidate).resolve()
@@ -356,7 +359,13 @@ def main():
         ]
         logger.info("[SMOKE TEST MODE ENABLED] Running 1 regime (suite1_flat), 1 seed (42), 2 controllers.")
     else:
-        seeds = parse_seed_list(args.seeds)
+        if args.seeds is not None:
+            seeds = parse_seed_list(args.seeds)
+        elif args.preset == "20seed":
+            seeds = FULL_20_SEEDS
+        else:
+            seeds = DEFAULT_SEEDS  # [42, 101, 202]
+
         regimes = args.regimes
         controllers = [(k, n) for k, n in CONTROLLERS if k in args.controllers]
 
@@ -368,6 +377,7 @@ def main():
 
     total_runs = len(tasks)
     logger.info(f"Target Runs: {total_runs} (Regimes={len(regimes)}, Seeds={len(seeds)}, Controllers={len(controllers)})")
+    logger.info(f"Seed Selection: {seeds}")
     logger.info(f"Parallel Workers: {args.workers}")
     logger.info(f"Output Directory: {out_root}")
 
@@ -405,15 +415,28 @@ def main():
     total_duration = time.time() - t_start
     logger.info(f"All {len(results)} simulations completed in {total_duration:.1f}s.")
 
-    # Save to consolidated CSV and JSON inside out_root
-    df = pd.DataFrame(results)
+    # Save to consolidated CSV with seamless resume merging
+    df_new = pd.DataFrame(results)
     csv_path = out_root / "multiseed_summary.csv"
+    if csv_path.exists() and not args.force:
+        try:
+            df_old = pd.read_csv(csv_path)
+            df = pd.concat([df_old, df_new], ignore_index=True).drop_duplicates(
+                subset=["controller_key", "regime", "seed"], keep="last"
+            )
+            logger.info(f"Merged {len(df_new)} new runs with {len(df_old)} existing runs (Total={len(df)})")
+        except Exception as e:
+            logger.warning(f"Failed to merge with existing CSV: {e}")
+            df = df_new
+    else:
+        df = df_new
+
     df.to_csv(csv_path, index=False)
     logger.info(f"Consolidated CSV saved to: {csv_path}")
 
     json_path = out_root / "multiseed_raw_readings.json"
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
+        json.dump(df.to_dict(orient="records"), f, indent=2)
     logger.info(f"Consolidated JSON saved to: {json_path}")
 
     # Print quick console overview
@@ -433,7 +456,13 @@ def main():
         })
         print(agg.to_string())
     print("=" * 80)
-    print(f"Next Step: Run processing script: ./.venv/bin/python scripts/process_step8_v3_statistics.py --input-dir {out_root}")
+
+    # Auto-trigger statistical processing and documentation report
+    if not args.no_auto_process:
+        proc_script = WORKSPACE_ROOT / "scripts" / "process_step8_v3_statistics.py"
+        if proc_script.exists():
+            print("\nTriggering automatic statistical processing & docs synchronization...")
+            subprocess.run([str(VENV_PYTHON), str(proc_script), "--input-dir", str(out_root)], cwd=str(WORKSPACE_ROOT))
 
 
 if __name__ == "__main__":
