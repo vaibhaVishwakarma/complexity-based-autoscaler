@@ -20,8 +20,8 @@ Both controllers were evaluated under identical simulation seeds (`seed=42`), id
 | :--- | :---: | :---: | :---: | :---: |
 | **Total Provisioned Cost** | $27,900.0\text{ ws}$ | $14,261.0\text{ ws}$ | **$11,874.0\text{ ws}$** | **$2,387.0\text{ fewer worker-seconds}$ ($16.74\%$ cheaper)** |
 | **Cost Savings vs Fixed** | $0.00\%$ | $48.88\%$ | **$57.44\%$** | **$+8.56\text{ percentage points}$ higher savings** |
-| **Deadline Misses ($M$)** | $0$ | **$44$ misses** | **$0$ misses** | **$100\%$ SLA Compliance (0 misses vs 44)** |
-| **SLA Pass Rate across Regimes** | $13 / 13$ ($100\%$) | $6 / 13$ ($46.2\%$) | **$13 / 13$ ($100\%$)** | **InferLine failed in 7 regimes; v3 passed all 13** |
+| **Overall SLA Compliance** | $100.00\%$ ($0$ misses) | $99.964\%$ ($44$ misses) | **$100.00\%$ ($0$ misses)** | **Zero misses across all 121,134 requests** |
+| **Regimes with Exactly Zero Misses** | $13 / 13$ ($100\%$) | $7 / 13$ ($53.8\%$) | **$13 / 13$ ($100\%$)** | **All 13 regimes achieve 0 misses (vs 7 for InferLine)** |
 | **Max P99 Tail Latency** | $5.00\text{s}$ | $7.00\text{s}$ | **$6.00\text{s}$** | **$1.00\text{s}$ lower peak tail latency** |
 | **Total Scaling Flapping ($\Delta$)** | $205$ | $855$ | **$228$** | **$627\text{ fewer scaling actions}$ ($73.33\%$ smoother)** |
 
@@ -56,20 +56,20 @@ The table below contrasts InferLine against Evolved Policy v3 for each individua
 
 | Regime Name | Requests | Misses | Worker-Sec | Mean Workers | Mean Latency | P95 Latency | P99 Latency | Mean Queue Wait | Scaling Deltas | Fixed Cost (ws) | Savings vs Fixed | Status |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `suite1_flat` | $6,047$ | $0$ | $682.0$ | $9.09$ | $4.53\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.023\text{s}$ | $44$ | $1,350.0$ | $49.48\%$ | Pass |
-| `suite1_spike` | $5,564$ | **$6$** | $837.0$ | $8.81$ | $4.56\text{s}$ | $5.0\text{s}$ | $6.0\text{s}$ | $0.057\text{s}$ | $66$ | $1,710.0$ | $51.05\%$ | **FAIL (SLA Breach)** |
-| `suite1_burst` | $3,753$ | $0$ | $701.0$ | $7.38$ | $4.55\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.035\text{s}$ | $47$ | $1,710.0$ | $59.01\%$ | Pass |
-| `suite1_ramp` | $12,259$ | $0$ | $1,233.0$ | $9.13$ | $4.52\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.023\text{s}$ | $70$ | $2,430.0$ | $49.26\%$ | Pass |
-| `suite1_zero_begin` | $5,393$ | $0$ | $590.0$ | $6.94$ | $4.51\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.007\text{s}$ | $19$ | $1,530.0$ | $61.44\%$ | Pass |
-| `suite1_zero_terminal` | $13,956$ | **$10$** | $1,511.0$ | $8.39$ | $4.53\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.028\text{s}$ | $53$ | $3,240.0$ | $53.36\%$ | **FAIL (SLA Breach)** |
-| `suite2_shock` | $9,057$ | $0$ | $1,098.0$ | $10.46$ | $4.53\text{s}$ | $5.0\text{s}$ | $6.0\text{s}$ | $0.023\text{s}$ | $68$ | $1,890.0$ | $41.90\%$ | Pass |
-| `suite2_recovery` | $12,122$ | $0$ | $1,397.0$ | $10.35$ | $4.52\text{s}$ | $5.0\text{s}$ | $6.0\text{s}$ | $0.021\text{s}$ | $74$ | $2,430.0$ | $42.51\%$ | Pass |
-| `suite2_compound_stress` | $12,295$ | **$9$** | $1,314.0$ | $9.73$ | $4.54\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.041\text{s}$ | $92$ | $2,430.0$ | $45.93\%$ | **FAIL (SLA Breach)** |
-| `suite2_compound_relief` | $14,332$ | $0$ | $1,589.0$ | $11.77$ | $4.53\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.031\text{s}$ | $98$ | $2,430.0$ | $34.61\%$ | Pass |
-| `suite2_decoupled_opposing` | $12,068$ | **$8$** | $1,266.0$ | $9.38$ | $4.55\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.050\text{s}$ | $72$ | $2,430.0$ | $47.90\%$ | **FAIL (SLA Breach)** |
-| `suite2_storm` | $9,054$ | **$6$** | $978.0$ | $9.31$ | $4.53\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.031\text{s}$ | $64$ | $1,890.0$ | $48.25\%$ | **FAIL (SLA Breach)** |
-| `suite3_azure` | $5,086$ | **$5$** | $1,065.0$ | $7.89$ | $4.56\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.052\text{s}$ | $88$ | $2,430.0$ | $56.17\%$ | **FAIL (SLA Breach)** |
-| **TOTAL** | **$121,046$** | **$44$** | **$14,261.0$** | **$9.14$** | **$4.53\text{s}$** | **$5.0\text{s}$** | **$7.0\text{s}$** | **$0.029\text{s}$** | **$855$** | **$27,900.0$** | **$48.88\%$** | **7 Regimes Failed** |
+| `suite1_flat` | $6,047$ | $0$ | $682.0$ | $9.09$ | $4.53\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.023\text{s}$ | $44$ | $1,350.0$ | $49.48\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite1_spike` | $5,564$ | **$6$** | $837.0$ | $8.81$ | $4.56\text{s}$ | $5.0\text{s}$ | $6.0\text{s}$ | $0.057\text{s}$ | $66$ | $1,710.0$ | $51.05\%$ | $99.89\%$ SLO ($6$ misses) |
+| `suite1_burst` | $3,753$ | $0$ | $701.0$ | $7.38$ | $4.55\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.035\text{s}$ | $47$ | $1,710.0$ | $59.01\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite1_ramp` | $12,259$ | $0$ | $1,233.0$ | $9.13$ | $4.52\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.023\text{s}$ | $70$ | $2,430.0$ | $49.26\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite1_zero_begin` | $5,393$ | $0$ | $590.0$ | $6.94$ | $4.51\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.007\text{s}$ | $19$ | $1,530.0$ | $61.44\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite1_zero_terminal` | $13,956$ | **$10$** | $1,511.0$ | $8.39$ | $4.53\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.028\text{s}$ | $53$ | $3,240.0$ | $53.36\%$ | $99.93\%$ SLO ($10$ misses) |
+| `suite2_shock` | $9,057$ | $0$ | $1,098.0$ | $10.46$ | $4.53\text{s}$ | $5.0\text{s}$ | $6.0\text{s}$ | $0.023\text{s}$ | $68$ | $1,890.0$ | $41.90\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite2_recovery` | $12,122$ | $0$ | $1,397.0$ | $10.35$ | $4.52\text{s}$ | $5.0\text{s}$ | $6.0\text{s}$ | $0.021\text{s}$ | $74$ | $2,430.0$ | $42.51\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite2_compound_stress` | $12,295$ | **$9$** | $1,314.0$ | $9.73$ | $4.54\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.041\text{s}$ | $92$ | $2,430.0$ | $45.93\%$ | $99.93\%$ SLO ($9$ misses) |
+| `suite2_compound_relief` | $14,332$ | $0$ | $1,589.0$ | $11.77$ | $4.53\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.031\text{s}$ | $98$ | $2,430.0$ | $34.61\%$ | $100.0\%$ SLO ($0$ misses) |
+| `suite2_decoupled_opposing` | $12,068$ | **$8$** | $1,266.0$ | $9.38$ | $4.55\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.050\text{s}$ | $72$ | $2,430.0$ | $47.90\%$ | $99.93\%$ SLO ($8$ misses) |
+| `suite2_storm` | $9,054$ | **$6$** | $978.0$ | $9.31$ | $4.53\text{s}$ | $5.0\text{s}$ | $5.0\text{s}$ | $0.031\text{s}$ | $64$ | $1,890.0$ | $48.25\%$ | $99.93\%$ SLO ($6$ misses) |
+| `suite3_azure` | $5,086$ | **$5$** | $1,065.0$ | $7.89$ | $4.56\text{s}$ | $5.0\text{s}$ | $7.0\text{s}$ | $0.052\text{s}$ | $88$ | $2,430.0$ | $56.17\%$ | $99.90\%$ SLO ($5$ misses) |
+| **TOTAL** | **$121,046$** | **$44$** | **$14,261.0$** | **$9.14$** | **$4.53\text{s}$** | **$5.0\text{s}$** | **$7.0\text{s}$** | **$0.029\text{s}$** | **$855$** | **$27,900.0$** | **$48.88\%$** | **$99.964\%$ SLO ($6$ regimes with misses)** |
 
 ---
 
