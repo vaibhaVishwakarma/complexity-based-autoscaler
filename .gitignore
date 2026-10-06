@@ -34,6 +34,8 @@ data/tinyimagenet/val/
 # ── Experiment Outputs & Runtime Logs ──────────────────────────────────────────
 output/*
 !output/evolved_policy.py
+!output/evolved_policy_v2.py
+!output/evolved_policy_v3.py
 !output/evolution_runs/
 output/evolution_runs/*
 !output/evolution_runs/*.csv
