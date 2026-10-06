@@ -1,0 +1,24 @@
+# OpenEvolve v4 Algorithm Discovery Log (Pareto-Optimal Cost + Low-Tail-Latency)
+
+- **Last Updated**: `2026-10-06 10:30:19 UTC`
+- **Objective**: Maximize $J_{v4}$ (Retain $>55\%$ cost savings, 0 misses, and squash Max P99 from $6.0\text{s} \to \le 5.0\text{s}$)
+- **Total Discovered Policies**: `0`
+- **Top Discovered Fitness**: `Pending`
+
+---
+
+## 1. Top 5 Discovered Policies (Ranked by v4 Fitness $J_{v4}$)
+
+| Rank | Program ID | Island | Iteration | Fitness ($J_{v4}$) | Cost Savings (%) | Max P99 (s) | Mean P99 (s) | Deadline Misses | Worker-Sec | Flapping (Deltas) |
+| :---: | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+
+---
+
+## 2. Reference Baselines
+
+| Controller | Cost (ws) | Savings vs Fixed | SLA Misses | Max P99 | Flapping | Fitness ($J_{v4}$) |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Fixed Capacity Peak** | 27900.0 | 0.00% | 0 | 5.00s | 205 | 0.00 |
+| **InferLine (ACM SoCC '20)** | 14261.0 | 48.88% | 44 | 7.00s | 855 | -75.00 |
+| **v3 Champion (bbd9b1c2)** | 11874.0 | 57.44% | **0** | 6.00s | **228** | **40.16** |
+

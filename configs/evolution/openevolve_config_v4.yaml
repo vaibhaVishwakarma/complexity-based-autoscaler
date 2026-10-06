@@ -1,0 +1,240 @@
+# openevolve_config_v4.yaml — Step 6 v4: Pareto-Optimal (Cost + Tail Latency) Evolutionary Search
+#
+# Role:
+#   Master configuration for the Step 7 v4 evolutionary search. Formulates the
+#   Pareto-optimal objective: retain the champion's > 55% cost savings and 0 deadline
+#   misses while actively searching for predictive mechanisms (queue velocity, ingress
+#   acceleration, task age urgency) to squash P99 tail latency from 6.00s down to <= 5.00s.
+#
+# Gate Stage:   Step 6 v4 (OpenEvolve Configuration & Cascade Evaluator)
+# Strategy Ref: docs/CONFORMAL_AUTOSCALER_STRATEGY.md Section 9 & 10
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOP-LEVEL EVOLUTION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+max_iterations: 200
+checkpoint_interval: 1
+log_level: "INFO"
+random_seed: 42
+language: "python"
+file_suffix: ".py"
+
+diff_based_evolution: true
+enforce_evolve_blocks: true
+max_code_length: 25000
+
+early_stopping_patience: 50
+convergence_threshold: 0.01
+early_stopping_metric: "combined_score"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM CONFIGURATION (WITH MULTI-KEY QUOTA AUTO-ROTATION)
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  models:
+    - name: "gemini-3.5-flash-lite"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.6
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-flash-lite-latest"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.3
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-3-flash-preview"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.1
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMPT CONFIGURATION (V4 PARETO-OPTIMAL COST + TAIL-LATENCY DIRECTIVES)
+# ─────────────────────────────────────────────────────────────────────────────
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  include_artifacts: true
+  max_artifact_bytes: 10240
+  suggest_simplification_after_chars: 4000
+
+  island_system_messages:
+    - |
+      You are an expert autoscaling researcher evolving the CORE CONFORMAL BRANCH (Island 0).
+      Your primary mission: evolve a lean, mathematically optimal conformal autoscaling policy that
+      MAINTAINS > 55% COST SAVINGS while aggressively reducing P99 TAIL LATENCY from 6.00s down to <= 5.00s.
+
+      V4 Fitness Objective:
+        J_v4 = cost_savings_% - miss_penalty - p99_penalty - churn_penalty + tail_bonus
+        1. COST SAVINGS FOUNDATION: (+1.0 pt per 1% savings vs Fixed Capacity 27,900 ws).
+           Your initial seed (Program bbd9b1c2) already achieved 57.44% savings (11,874 ws) and 0 misses!
+           Target: Retain 55% - 58% savings without unnecessary overprovisioning.
+        2. AGGRESSIVE TAIL LATENCY REDUCTION:
+           Target: Max P99 <= 5.00s across ALL 13 stress regimes!
+           Penalty: 15.0 * max(0.0, max_p99_s - 5.0s) + 5.0 * max(0.0, mean_p99_s - 4.8s).
+           If max P99 is 6.0s (like the seed), you suffer a 15.0 point penalty!
+           Spending ~100-200 worker-seconds (< 0.7% cost) to squash the tail spike gains +14.3 net fitness!
+        3. ZERO DEADLINE MISSES IS MANDATORY:
+           Miss penalty is lethal: 3.0 * min(M, 50) + 15.0 * max(0, M - 50).
+        4. CHURN PENALTY: 0.01 * deltas (keep actuation smooth).
+
+      Design Directives for Island 0:
+      - Predictive Spike Dampening: Use `state.ingress_acceleration` and `state.cloud_queue_velocity`
+        to temporarily shorten `DRAIN_WINDOW_S` (from 2.08s down to 1.2s-1.5s) ONLY when a sudden surge is detected.
+      - Dynamic Booting Credit: Scale down booting credit from 0.95 to 0.70 when `cloud_queue_velocity > 0`
+        so the cluster doesn't wait passively for spinning containers while requests pile up.
+      - Return int k in [1, 18]. No unauthorized imports.
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the ACCELERATION & CAUSAL DYNAMICS RADICAL (Island 1).
+      Your core mission: exploit second-order dynamics (ingress acceleration, queue velocity, triage velocity)
+      to actuate PREEMPTIVELY before queue delay builds, flattening tail latency to 5.0s.
+
+      V4 Fitness Objective:
+        J_v4 = cost_savings_% - miss_penalty - p99_penalty - churn_penalty + tail_bonus
+        1. Cost savings: Maintain > 55% savings!
+        2. Tail latency target: Max P99 <= 5.0s. Severe penalty for P99 > 5.0s (15.0 * excess).
+        3. Zero deadline misses.
+
+      Available Causal Signals in TelemetricState:
+      - state.ingress_acceleration: d^2(lambda)/dt^2 (detects sudden step-spikes in frame arrival)
+      - state.cloud_queue_velocity: dQ/dt (detects queue buildup before it accumulates delay)
+      - state.p_fast_velocity: dp_fast/dt (< 0 indicates edge triage collapse)
+      - state.oldest_task_age_s: Head-of-line task queuing age (urgency beacon)
+
+      Design Directives for Island 1:
+      - Preemptive Surge Injection: When ingress_acceleration > 20.0 or cloud_queue_velocity > 5.0,
+        add a proactive transient boost: `boost = min(3, int(ingress_acceleration * 0.03 + cloud_queue_velocity * 0.15))`.
+      - Steady-State Frugality: When ingress_acceleration <= 0 and queue is empty, immediately revert to lean baseline.
+      - Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief. You MUST immediately provide your modifications as SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the TASK-AGE URGENCY & DRAIN HYBRID (Island 2).
+      Your core mission: introduce deadline-aware queue drainage using `oldest_task_age_s` to guarantee
+      zero tail latency degradation without spending extra worker-seconds during quiescent periods.
+
+      V4 Fitness Objective:
+        J_v4 = cost_savings_% - miss_penalty - p99_penalty - churn_penalty + tail_bonus
+        1. Cost savings: Keep provisioned cost < 12,200 ws (> 56% savings).
+        2. Tail latency: Max P99 <= 5.0s across all regimes.
+        3. Zero deadline misses.
+
+      Design Directives for Island 2:
+      - Urgency-Modulated Drain Window: Instead of static DRAIN_WINDOW_S = 2.08s, modulate dynamically:
+        `drain_window = 2.08 - 0.30 * min(3.0, max(0.0, state.oldest_task_age_s - 1.0))`
+        When oldest task age is low, drain window stays wide (saving energy); as tasks age, drain accelerates!
+      - Asymmetric Scale-Down: Guard against downscaling when oldest_task_age_s > 2.0s even if queue depth is 1.
+      - Return int k in [1, 18].
+
+      CRITICAL FORMAT REQUIREMENT:
+      Keep explanation brief. You MUST immediately provide your modifications as SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE CONFIGURATION (MAP-Elites Archive & Island Topology)
+# ─────────────────────────────────────────────────────────────────────────────
+
+database:
+  in_memory: false
+  db_path: "output/evolution_runs_v4/openevolve_db"
+
+  population_size: 500
+  archive_size: 100
+
+  num_islands: 3
+
+  elite_selection_ratio: 0.10
+  exploitation_ratio: 0.70
+  exploration_ratio: 0.20
+
+  feature_dimensions:
+    - "cost_savings"
+    - "churn_stability"
+    - "tail_safety"
+  feature_bins: 10
+
+  migration_interval: 20
+  migration_rate: 0.10
+
+  random_seed: 42
+
+  log_prompts: true
+  enable_artifacts: true
+  cleanup_old_artifacts: false
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVALUATOR CONFIGURATION (Cascade Pipeline)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evaluator:
+  timeout: 300
+  cascade_evaluation: true
+  cascade_thresholds:
+    - 0.5
+    - 0.5
+
+  parallel_evaluations: 1
+  enable_artifacts: true
+  max_artifact_storage: 104857600
+  max_retries: 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVOLUTION TRACE LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+
+evolution_trace:
+  enabled: true
+  format: "jsonl"
+  include_code: true
+  include_prompts: true
+  output_path: "output/evolution_runs_v4/evolution_trace.jsonl"
+  buffer_size: 1
+  compress: false
