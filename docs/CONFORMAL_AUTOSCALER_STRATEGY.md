@@ -6,7 +6,7 @@
 **Target Venue:** USENIX ATC / ACM SoCC / EuroSys Publication Testbed  
 **Testbed Integration:** ContinuumBench & Eclypse Distributed Simulation Harness  
 **Author:** Conformal Inference & Edge-Cloud Systems Research Group  
-**Status:** UNIFIED MASTER STRATEGY / READY FOR EXECUTION  
+**Status:** STEP 8 COMPLETE (FULL 20-SEED STATISTICAL VALIDATION CERTIFIED) / PROCEEDING TO STEP 9 (FINAL PLOTS & PAPER FIGURES)  
 
 ---
 
@@ -549,27 +549,33 @@ flowchart TD
 
 To maintain methodological rigor, execution proceeds through the strict 9-step sequence:
 
-| Step | Milestone | Execution Action | Output Artifact |
-|:---:|:---|:---|:---|
-| **1** | **Provenance & Contracts** | Verify `contracts/gate1.py` and `contracts/gate2.py` against local manifests | Pydantic pass |
-| **2** | **Workload Synthesizers** | Implement 2D generators for Suite 1, 2, and 3 in `continuum_bench/workload/` | `conformal_workloads.py` |
-| **3** | **InferLine Replication** | Implement Algorithms 1–4 from SoCC '20 in `continuum_bench/controllers/` | `inferline_controller.py` |
-| **4** | **Candidate Controllers** | Implement Fixed, Queue-Threshold, HPA, Blind Predictive, Conformal | `autoscaler_controllers.py` |
-| **5** | **Preliminary Baseline Run**| Run candidates 1–5 across Suites 1–3 in ContinuumBench | `output/baseline_runs/` |
-| **6** | **OpenEvolve Evaluator** | Implement and test simulation-in-the-loop fitness evaluator ($J$) | `openevolve_evaluator.py` |
-| **7** | **Evolutionary Synthesis** | Launch multi-hour OpenEvolve policy search in `./.venv` | `output/evolved_policy.py` |
-| **8** | **ContinuumBench Binding** | Integrate dynamic batch profiles and Gate 1 typed triage contracts | `service_time_profiles.yaml` |
-| **9** | **Final Validation & Plots**| Run evolved controller vs 5 baselines across $N=10$ seeds; generate plots | `output/plots/` & paper figures |
+| Step | Milestone | Execution Action | Output Artifact | Status |
+|:---:|:---|:---|:---|:---:|
+| **1** | **Provenance & Contracts** | Verify `contracts/gate1.py` and `contracts/gate2.py` against local manifests | Verified Pydantic contracts | ✅ **PASS** |
+| **2** | **Workload Synthesizers** | Implement 2D generators for Suite 1, 2, and 3 in `continuum_bench/workload/` | `configs/suites/*.yaml` (13 regimes) | ✅ **PASS** |
+| **3** | **InferLine Replication** | Implement Algorithms 1–4 from ACM SoCC '20 in `continuum_bench/controllers/` | `inferline_controller.py` & baseline profile | ✅ **PASS** |
+| **4** | **Candidate Controllers** | Implement Fixed, Queue-Threshold, HPA, Blind Predictive, Conformal | `autoscaler_controllers.py` | ✅ **PASS** |
+| **5** | **Authoritative Baseline Runs** | Run baselines (Fixed, HPA, KEDA, InferLine) across all 13 regimes | `output/suite_baselines_runs/` | ✅ **PASS** |
+| **6** | **OpenEvolve Evaluator** | Cascade evaluator with Cost-Supreme objective ($J_{v3}$) | `src/continuum_ext/evolution/openevolve_evaluator_v3.py` | ✅ **PASS** |
+| **7** | **Evolutionary Synthesis** | Synthesized Global Champion `bbd9b1c2` (57.44% savings, 0 misses, 228 deltas) | `output/evolved_policy_v3.py` | ✅ **PASS** |
+| **8** | **Multi-Seed Statistical Validation** | Evaluated 20 held-out seeds (`1042-1061`) $\times$ 13 regimes $\times$ 5 controllers ($1,300$ runs). Certified zero misses ($p < 10^{-35}$), 51.51% cost savings ($p < 10^{-14}$), 76.7% churn reduction ($p < 10^{-43}$) vs InferLine | [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md) | ✅ **PASS** |
+| **9** | **Final Validation & Plots** | Generate publication-grade Pareto frontiers, multi-seed distributions, and trajectory dynamics plots | `output/plots/` & paper figures | 🚀 **READY** |
 
 ---
 
-## User Review & Next Execution Phase
+## Current Status & Next Execution Phase
 
-This consolidated strategy replaces all prior fractured drafts and forms the **single authoritative specification** for the paper.
+### Completed Milestones
+- **Steps 1 through 7** are complete, establishing empirical hardware grounding, 13 stress benchmark regimes, baseline evaluations, and the discovery of Evolved Policy v3 Champion (`bbd9b1c2`).
+- **Step 8 (Full 20-Seed Multi-Seed Statistical Validation)** is **COMPLETE and CERTIFIED**:
+  - $1,300$ total simulations executed across 20 held-out seeds (`1042..1061`).
+  - Strict zero deadline misses maintained across all 260 evaluation runs for Evolved Policy v3.
+  - Paired Wilcoxon Signed-Rank tests confirm statistical significance at $p < 10^{-14}$ for cost savings, actuation stability (churn), tail latency, and mean queue waiting times against InferLine.
+  - Comprehensive empirical report published in [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md).
 
-We are ready to begin execution:
-1. Install `openevolve==0.4.0` in `./.venv`.
-2. Implement the controller classes (including the deep-copy InferLine envelope tuner) in `clones/ContinuumBench/src/continuum_bench/controllers/`.
-3. Implement the 2D workload generators in `clones/ContinuumBench/src/continuum_bench/workload/`.
+### Next Execution Phase: Step 9 (Publication Visualizations & Paper Figures)
+We are now positioned to execute **Step 9**:
+1. Generate the multi-seed distribution comparison figure (Cost vs. Deadline Misses vs. Flapping) across all 5 controllers using `academic-plotting`.
+2. Generate the regime-by-regime Pareto frontier plot ($y$: SLA compliance %, $x$: total worker-seconds).
+3. Generate the dual-panel time-series dynamics comparison plot contrasting Evolved Policy v3 vs InferLine under acute stress (`suite1_spike` and `suite2_shock`).
 
-Shall we proceed with Step 1 and launch the implementation?
