@@ -100,8 +100,8 @@ CONTROLLERS = [
     ("keda", "KEDA Queue (Backlog=5)"),
 ]
 
-DEFAULT_SEEDS = [42, 101, 202]  # Phase 1: 3 seeds (42 calibration + 101, 202 evaluation)
-FULL_20_SEEDS = list(range(1042, 1062))  # Phase 2: 20 seeds for full validation
+DEFAULT_SEEDS = [1042, 1043, 1044]  # Phase 1: First 3 held-out evaluation seeds of the authoritative 20-seed suite
+FULL_20_SEEDS = list(range(1042, 1062))  # Phase 2: Complete 20 contiguous held-out seeds (1042 to 1061)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -364,7 +364,7 @@ def main():
         elif args.preset == "20seed":
             seeds = FULL_20_SEEDS
         else:
-            seeds = DEFAULT_SEEDS  # [42, 101, 202]
+            seeds = DEFAULT_SEEDS  # [1042, 1043, 1044] (Phase 1: first 3 held-out seeds)
 
         regimes = args.regimes
         controllers = [(k, n) for k, n in CONTROLLERS if k in args.controllers]
@@ -418,18 +418,23 @@ def main():
     # Save to consolidated CSV with seamless resume merging
     df_new = pd.DataFrame(results)
     csv_path = out_root / "multiseed_summary.csv"
+    target_seed_set = set(seeds)
+
     if csv_path.exists() and not args.force:
         try:
             df_old = pd.read_csv(csv_path)
-            df = pd.concat([df_old, df_new], ignore_index=True).drop_duplicates(
+            df_combined = pd.concat([df_old, df_new], ignore_index=True)
+            df = df_combined.drop_duplicates(
                 subset=["controller_key", "regime", "seed"], keep="last"
             )
-            logger.info(f"Merged {len(df_new)} new runs with {len(df_old)} existing runs (Total={len(df)})")
+            # Retain only target evaluation seeds to prevent contamination
+            df = df[df["seed"].isin(target_seed_set)].reset_index(drop=True)
+            logger.info(f"Consolidated {len(df)} runs for target seeds {sorted(target_seed_set)}")
         except Exception as e:
             logger.warning(f"Failed to merge with existing CSV: {e}")
-            df = df_new
+            df = df_new[df_new["seed"].isin(target_seed_set)].reset_index(drop=True)
     else:
-        df = df_new
+        df = df_new[df_new["seed"].isin(target_seed_set)].reset_index(drop=True)
 
     df.to_csv(csv_path, index=False)
     logger.info(f"Consolidated CSV saved to: {csv_path}")
