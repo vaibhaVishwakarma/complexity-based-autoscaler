@@ -37,26 +37,40 @@ WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 FIXED_CAPACITY_WORKER_SECONDS = 27_900.0
 
 
-def get_evolution_paths(version: str = "auto") -> tuple[Path, Path, Path, str]:
+def get_evolution_paths(version: str = "auto") -> tuple[Path, Path, Path, str, str]:
+    v4_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v4"
+    v3_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
+    v2_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
+
     if version == "auto":
-        v3_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
-        v2_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
-        if (v3_dir / "openevolve_db").exists() or (v3_dir / "evolution_trace.jsonl").exists():
+        if (v4_dir / "openevolve_db").exists() or (v4_dir / "evolution_trace.jsonl").exists():
+            chosen_dir = v4_dir
+            ver_label = "v4 Pareto-Optimal"
+            ver_slug = "v4"
+        elif (v3_dir / "openevolve_db").exists() or (v3_dir / "evolution_trace.jsonl").exists():
             chosen_dir = v3_dir
             ver_label = "v3 Cost-Supreme"
+            ver_slug = "v3"
         else:
             chosen_dir = v2_dir
             ver_label = "v2 Cost-First"
+            ver_slug = "v2"
+    elif version in ("4", "v4"):
+        chosen_dir = v4_dir
+        ver_label = "v4 Pareto-Optimal"
+        ver_slug = "v4"
     elif version in ("3", "v3"):
-        chosen_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
+        chosen_dir = v3_dir
         ver_label = "v3 Cost-Supreme"
+        ver_slug = "v3"
     else:
-        chosen_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
+        chosen_dir = v2_dir
         ver_label = "v2 Cost-First"
+        ver_slug = "v2"
 
     db_dir = chosen_dir / "openevolve_db" / "programs"
     trace_file = chosen_dir / "evolution_trace.jsonl"
-    return chosen_dir, db_dir, trace_file, ver_label
+    return chosen_dir, db_dir, trace_file, ver_label, ver_slug
 
 
 def load_programs_from_db(db_programs_dir: Path) -> List[Dict[str, Any]]:
@@ -105,9 +119,10 @@ def load_programs_from_trace(trace_file: Path) -> List[Dict[str, Any]]:
 
 
 def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False, version: str = "auto"):
-    evolution_dir, db_programs_dir, trace_file, ver_label = get_evolution_paths(version)
-    output_dir = WORKSPACE_ROOT / "output" / "top20_variants"
-    tarball_output = WORKSPACE_ROOT / "top20_evolved_variants.tar.gz"
+    evolution_dir, db_programs_dir, trace_file, ver_label, ver_slug = get_evolution_paths(version)
+    output_dir = WORKSPACE_ROOT / "output" / f"top{top_n}_variants"
+    tarball_output = WORKSPACE_ROOT / f"top{top_n}_evolved_variants_{ver_slug}.tar.gz"
+    generic_tarball = WORKSPACE_ROOT / "top20_evolved_variants.tar.gz"
 
     print("=" * 70)
     print(f" EXPORTING TOP {top_n} EVOLVED VARIANTS ({ver_label})")
@@ -236,10 +251,13 @@ Mutation Rationale:
 
     # 7. Copy auxiliary lightweight reporting files if they exist
     aux_files = [
+        WORKSPACE_ROOT / "output" / "evolved_policy_v4.py",
         WORKSPACE_ROOT / "output" / "evolved_policy_v3.py",
         WORKSPACE_ROOT / "output" / "evolved_policy_v2.py",
+        WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md",
         WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V3.md",
         WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V2.md",
+        evolution_dir / "evolution_telemetry_summary.json",
         evolution_dir / "algorithm_performance_log.csv",
         evolution_dir / "llm_calls_log.csv",
         evolution_dir / "evolution_trace.jsonl",
@@ -253,12 +271,18 @@ Mutation Rationale:
     with tarfile.open(tarball_output, "w:gz") as tar:
         tar.add(str(output_dir), arcname="top20_variants")
 
+    # Also duplicate/link to generic top20_evolved_variants.tar.gz for convenience
+    try:
+        shutil.copy(str(tarball_output), str(generic_tarball))
+    except Exception:
+        pass
+
     tar_size_kb = tarball_output.stat().st_size / 1024
     tar_size_mb = tar_size_kb / 1024
     size_str = f"{tar_size_mb:.2f} MB" if tar_size_mb >= 1.0 else f"{tar_size_kb:.1f} KB"
     print("=" * 70)
     print(f" PACKAGING COMPLETE!")
-    print(f"  Output Tarball: {tarball_output}")
+    print(f"  Output Tarball: {tarball_output.name} (and {generic_tarball.name})")
     print(f"  Tarball Size:   {size_str} (bypassed 18GB of temporary simulation logs!)")
     print("=" * 70)
 
@@ -282,7 +306,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export top discovered policies into a lightweight tarball.")
     parser.add_argument("--top", type=int, default=20, help="Number of top variants to export (default: 20)")
     parser.add_argument("--clean-sim-logs", action="store_true", help="Delete disposable tmp* simulation folders to free disk space")
-    parser.add_argument("--version", type=str, default="auto", choices=["auto", "2", "v2", "3", "v3"], help="Run version to export (default: auto)")
+    parser.add_argument("--version", type=str, default="auto", choices=["auto", "2", "v2", "3", "v3", "4", "v4"], help="Run version to export (default: auto)")
     args = parser.parse_args()
 
     export_top_variants(top_n=args.top, clean_sim_logs=args.clean_sim_logs, version=args.version)
