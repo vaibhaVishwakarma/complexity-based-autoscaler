@@ -79,6 +79,23 @@ To prevent evolution interruptions due to Gemini API rate limits or quota exhaus
 
 ---
 
+## 4.1. Real-Time Resource & Code Mutation Churn Monitoring
+
+OpenEvolve v4 introduces full-spectrum telemetric tracking recorded to `output/evolution_runs_v4/evolution_telemetry_summary.json` and mirrored in real time to [`docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md`](file:///home/vaibo/edgecompute/docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md):
+
+1. **LLM Token Consumption**:
+   - **Prompt Tokens**: Input context, candidate code, evaluation artifacts, and system instructions.
+   - **Completion Tokens**: Generated diff blocks, reasoning thoughts, and mutation explanations.
+   - **Total Tokens Consumed**: Cumulative sum across all iterations.
+   - **Model Breakdown**: Per-model consumption across `gemini-3.5-flash-lite`, `gemini-flash-lite-latest`, and `gemini-3-flash-preview`.
+2. **Code Mutation Churn**:
+   - **Lines Added (`+`)**: Total number of code lines inserted across all mutation events.
+   - **Lines Deleted (`-`)**: Total number of code lines pruned/replaced across all mutation events.
+   - **Net Line Delta**: Cumulative net growth or shrinkage of evolved policy codebases.
+   - **Mutation Edit Hunks**: Total count of atomic search/replace unified diff patches synthesized and validated.
+
+---
+
 ## 5. Execution Commands
 
 ### In Development / Verification
@@ -94,4 +111,5 @@ To prevent evolution interruptions due to Gemini API rate limits or quota exhaus
 ```bash
 nohup ./.venv/bin/python scratch/run_evolution_v4.py --iterations 200 > evolution_v4.log 2>&1 &
 ```
-Real-time discovery metrics and policy comparisons are automatically synced to [`docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md`](file:///home/vaibo/edgecompute/docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md).
+Real-time discovery metrics, token consumption, code churn, and policy comparisons are automatically synced to [`docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md`](file:///home/vaibo/edgecompute/docs/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V4.md).
+

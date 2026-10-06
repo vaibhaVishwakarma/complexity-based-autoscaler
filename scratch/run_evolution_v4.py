@@ -326,7 +326,12 @@ def main():
         orig_save_checkpoint(iteration)
         try:
             from log_discovery_v4 import sync_logs
-            sync_logs()
+            t = sync_logs()
+            logger.info(
+                f"📊 [Telemetry Iter {iteration}]: Tokens: {t['total_tokens']:,} "
+                f"(Prompt: {t['total_prompt_tokens']:,}, Comp: {t['total_completion_tokens']:,}) | "
+                f"Code Churn: +{t['total_lines_added']}/-{t['total_lines_deleted']} lines ({t['total_edit_hunks']} edit hunks)"
+            )
         except Exception as err:
             logger.warning(f"Could not sync discovery logs at iteration {iteration}: {err}")
 
@@ -363,7 +368,18 @@ def main():
 
         try:
             from log_discovery_v4 import sync_logs
-            sync_logs()
+            t = sync_logs()
+            logger.info("=" * 70)
+            logger.info("CUMULATIVE EVOLUTION TELEMETRY SUMMARY:")
+            logger.info(f"  Total LLM Calls:       {t['total_llm_calls']:,}")
+            logger.info(f"  Total Prompt Tokens:   {t['total_prompt_tokens']:,}")
+            logger.info(f"  Total Comp Tokens:     {t['total_completion_tokens']:,}")
+            logger.info(f"  Total Tokens Consumed: {t['total_tokens']:,}")
+            logger.info(f"  Code Lines Added:      +{t['total_lines_added']:,}")
+            logger.info(f"  Code Lines Deleted:    -{t['total_lines_deleted']:,}")
+            logger.info(f"  Net Line Delta:        {t['total_net_lines']:+,}")
+            logger.info(f"  Total Edit Hunks:      {t['total_edit_hunks']:,}")
+            logger.info("=" * 70)
         except Exception as e:
             logger.warning(f"Could not update discovery logs: {e}")
 
