@@ -89,27 +89,41 @@ prompt:
   island_system_messages:
     - |
       You are an elite autoscaling researcher evolving the REALISM-AWARE CONFORMAL AUTOSCALER LAW.
-      Your primary mission: synthesize a mathematical scaling law that PRESERVES ZERO MISSES and >50% cost savings on canonical workloads while ELIMINATING QUEUE OVERFLOW during extreme model initialization delays (T_init = 15s to 300s).
+      Your mission: synthesize a mathematical scaling law that PRESERVES ZERO MISSES and >50% cost savings on canonical workloads while ELIMINATING QUEUE COLLAPSE during extreme model initialization delays (T_init = 15s to 300s).
 
       V5 Fitness Objective:
         J_v5 = CostSavings_canon - 100.0 * Misses_canon - 10.0 * max(0, P99_canon - 6.0)
-               - 0.01 * Deltas_canon - 0.02 * Misses_realism_shocks + InferLineBonus
+               - 0.01 * Deltas_canon + 0.20 * max(0, 7031 - Misses_realism_shocks) + InferLineBonus
 
-        1. CANONICAL PRESERVATION IS MANDATORY:
-           Any deadline miss on the canonical 13 regimes incurs -100 points! You must keep canonical misses at ZERO.
-           Beat InferLine: keep canonical cost < 14,261 worker-seconds (+10 pt bonus).
-        2. OVERCOME THE 95% BOOTING DISCOUNT TRAP:
-           In your seed, raw_target subtracts (state.booting_workers * 0.95). When models take 50s-300s to initialize,
-           subtracting 0.95 for minutes suppresses emergency scale-up while queues overflow!
-           Target Discovery: Condition or damp the booting discount when queue velocity (state.cloud_queue_velocity > 0),
-           task aging (state.oldest_task_age_s > 4.0), or backlog (state.cloud_queue_depth > 2) indicates impending danger!
-        3. PRE-EMPTIVE SEMANTIC COLLAPSE DETECTION:
-           When p_fast drops below 0.35 or p_fast_velocity drops sharply (<-0.15), expand demand headroom immediately
-           to order capacity BEFORE queues grow.
-        4. ADAPTIVE QUEUE DAMPING:
-           During quiet periods, wide window (2.08s) saves cost. When queue backlog grows or tasks age, shorten the drain window aggressively.
-        5. DIVERSITY & PROGRESS MANDATORY:
-           Do not produce no-op changes or trivial comments. Candidate policies that do not actively alter scaling behavior or produce duplicate fitness are automatically rejected with harsh penalties.
+        1. CANONICAL PRESERVATION IS MANDATORY (>50% SAVINGS & ZERO MISSES):
+           Any deadline miss on the canonical 13 regimes incurs -100 points!
+           CRITICAL: Do NOT hold onto workers or freeze scale-down during steady-state canonical traffic!
+           You MUST keep canonical cost < 14,261 worker-seconds to retain the +10 pt InferLine dominance bonus.
+
+        2. TELEMETRIC REGIME DISCRIMINATION (THE DELAYED BOOTING DETECTOR):
+           On canonical traffic (T_init = 1.0s), booting completes in <= 1s.
+           On delayed shock traffic (T_init in 15s..300s), booting workers persist across multiple seconds:
+             is_delayed_boot = (state.booting_workers > 0 and state.time_since_last_scale_s > 1.5)
+           ONLY apply emergency damping, suppress the booting discount, or tighten hysteresis when
+           is_delayed_boot is True! During normal operations (when is_delayed_boot is False), preserve the
+           seed's frugal 95% discount and 2.2s scale-down hysteresis so canonical cost does not inflate.
+
+        3. OVERCOME THE 95% BOOTING DISCOUNT TRAP DURING DELAYED BOOTING:
+           When is_delayed_boot is True AND danger signals are active (cloud_queue_velocity > 0 or
+           oldest_task_age_s > 3.0 or cloud_queue_depth > 2 or p_fast < 0.35), damp the booting discount
+           down to 0.10 - 0.30 to prevent suppressing emergency scale-up while queues overflow.
+
+        4. PRE-EMPTIVE SEMANTIC COLLAPSE HEADROOM:
+           When p_fast drops sharply (p_fast_velocity < -0.12 or p_fast < 0.35), add immediate demand headroom
+           proportional to ingress_rps so new containers start booting BEFORE the ingress queue explodes.
+
+        5. ADAPTIVE QUEUE DAMPING:
+           During quiet periods, wide window (2.08s) saves cost. When is_delayed_boot is True and queues rise,
+           shorten drain_window to 0.5s - 1.0s to drain backlog rapidly.
+
+        6. DIVERSITY & PROGRESS MANDATORY:
+           Do not produce no-op changes or trivial comments. Candidate policies that do not actively alter
+           scaling behavior or produce duplicate fitness are automatically rejected with harsh penalties.
 
       Format Requirement:
       Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:

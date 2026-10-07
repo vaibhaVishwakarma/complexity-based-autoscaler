@@ -439,20 +439,32 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
     # Actuation stability penalty
     churn_penalty = 0.01 * canon_deltas
 
-    # Realism shock optimization term: penalizes misses under extreme initialization delays
-    realism_shock_penalty = 0.02 * realism_misses
+    # Realism shock optimization term:
+    # Baseline seed suffers 7,031 shock misses across extreme initialization delays (15s..300s).
+    # We award +0.20 fitness points per shock miss reduced below baseline (50 misses saved = +10.0 pts),
+    # and penalize any regression above baseline at -0.05 per extra miss.
+    SEED_BASELINE_SHOCK_MISSES = 7031.0
+    shock_miss_delta = SEED_BASELINE_SHOCK_MISSES - realism_misses
+    if shock_miss_delta >= 0:
+        realism_shock_reward = 0.20 * shock_miss_delta
+    else:
+        realism_shock_reward = 0.05 * shock_miss_delta  # Negative penalty for regressions
 
     # InferLine Dominance Bonus: rewards policies beating InferLine while preserving zero canonical misses
     inferline_bonus = 0.0
-    if canon_misses == 0 and canon_cost < INFERLINE_COST_THRESHOLD_WS:
-        inferline_bonus = 10.0
+    if canon_misses == 0:
+        if canon_cost < INFERLINE_COST_THRESHOLD_WS:
+            inferline_bonus = 10.0
+        else:
+            # Smooth degradation rather than a cliff
+            inferline_bonus = max(0.0, 10.0 * (1.0 - (canon_cost - INFERLINE_COST_THRESHOLD_WS) / 3739.0))
 
     fitness_j = (
         cost_savings
         - canonical_miss_penalty
         - p99_penalty
         - churn_penalty
-        - realism_shock_penalty
+        + realism_shock_reward
         + inferline_bonus
     )
 
@@ -511,7 +523,7 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         "canonical_misses": float(canon_misses),
         "realism_misses": float(realism_misses),
         "churn_stability": max(0.0, 500.0 - canon_deltas),
-        "realism_resilience": max(0.0, 3000.0 - float(realism_misses)),
+        "realism_resilience": max(0.0, 7100.0 - float(realism_misses)),
         "tail_safety": max(0.0, 15.0 - canon_max_p99),
         "worker_seconds": float(canon_cost),
         "scaling_deltas": float(canon_deltas),

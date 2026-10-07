@@ -109,7 +109,7 @@ def run_supervisor(target_iterations: int, max_consecutive_failures: int = 5):
                 logger.info(f"Authoritative evolved policy exported at: {BEST_POLICY_FILE}")
             break
 
-        cmd = [str(PYTHON_BIN), str(EVOLUTION_SCRIPT), "--iterations", str(target_iterations)]
+        cmd = [str(PYTHON_BIN), "-u", str(EVOLUTION_SCRIPT), "--iterations", str(target_iterations)]
         if current_ckpt > 0:
             cmd.append("--resume")
 

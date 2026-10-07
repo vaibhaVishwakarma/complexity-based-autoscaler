@@ -327,7 +327,7 @@ def sync_markdown_dashboard(
         "The **v5 Evolutionary Search** bridges the physical realism gap while preserving the canonical floor:",
         "$$J_{\\text{v5}} = J_{\\text{canon}} + J_{\\text{realism\\_shocks}} + \\text{InferLineBonus}$$",
         "$$\\text{where } J_{\\text{canon}} = \\text{CostSavings\\%} - 100 \\cdot M_{\\text{canon}} - 10 \\cdot \\max(0, P99_{\\text{canon}} - 6.0) - 0.01 \\cdot \\Delta_{\\text{canon}}$$",
-        "$$J_{\\text{realism\\_shocks}} = -0.02 \\cdot M_{\\text{shock}} \\quad (T_{\\text{init}} \\in [15\\text{s}, 50\\text{s}, 150\\text{s}, 250\\text{s}, 300\\text{s}])$$",
+        "$$J_{\\text{realism\\_shocks}} = +0.20 \\cdot \\max(0, 7031 - M_{\\text{shock}}) \\quad (T_{\\text{init}} \\in [15\\text{s}, 50\\text{s}, 150\\text{s}, 250\\text{s}, 300\\text{s}])$$",
         "",
         "### Authoritative Benchmarks Comparison",
         "| Controller / Candidate | Canonical Cost | Cost Savings | Canonical Misses | Realism Shock Misses ($T_{\\text{init}} \\le 300\\text{s}$) | Fitness $J_{\\text{v5}}$ | Status |",
