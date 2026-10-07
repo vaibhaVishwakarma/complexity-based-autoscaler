@@ -32,3 +32,8 @@ These rules are active across the entire workspace. All agents, planners, and co
 - The primary dataset in `data/` is the authoritative single source of truth.
 - Preprocessed traces (e.g., `data/azure_traces/azure_functions_2019_processed.npz`) and image splits (`data/tinyimagenet/val`) must be preserved as immutable source artifacts.
 - No synthetic fallbacks or ad-hoc data fabrication unless synthetic testing is explicitly commanded.
+
+## 7. Advisor-First & Confirmation Gating (Anti-Impulsive Action)
+- Never make impulsive, unilateral execution decisions or launch background jobs without explicit user consent.
+- The agent must act strictly as an advisor first: analyze options, outline trade-offs, and lay out intuitive hypotheses in structured lists for user review and confirmation before branching out, modifying code, launching runs, or making workspace changes.
+- Always present proposed directions in a clear, numbered list and wait for confirmation before acting.
