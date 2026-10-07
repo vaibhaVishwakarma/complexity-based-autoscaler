@@ -44,11 +44,13 @@ import json
 import logging
 import math
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import traceback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -344,25 +346,32 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
     # Rejection criteria: must not exceed 25 misses on the fast triad
     passed = total_misses <= 25 and max_p99 <= 15.0
 
+    # Fixed capacity baseline worker-seconds for flat 1s (1350ws), shock 1s (1890ws), shock 15s (1890ws) = 5130ws
+    stage2_baseline_ws = 5130.0
+    stage2_cost_savings = (1.0 - total_cost / stage2_baseline_ws) * 100.0 if stage2_baseline_ws > 0 else 0.0
+
     summary = (
         f"Stage 2 Micro-Tranche (flat 1s, shock 1s, shock 15s):\n"
         f"  Total Misses: {total_misses}\n"
         f"  Max P99: {max_p99:.2f}s\n"
-        f"  Total Cost: {total_cost:.1f}ws\n"
+        f"  Total Cost: {total_cost:.1f}ws (Savings: {stage2_cost_savings:.2f}%)\n"
         f"  Passed: {passed}"
     )
 
     if not passed:
-        stem = Path(program_path).stem
-        candidate_sim_dir = EVOLUTION_OUTPUT_DIR / stem
-        if candidate_sim_dir.exists():
-            shutil.rmtree(candidate_sim_dir, ignore_errors=True)
+        try:
+            stem = Path(program_path).stem
+            candidate_sim_dir = EVOLUTION_OUTPUT_DIR / stem
+            if candidate_sim_dir.exists():
+                shutil.rmtree(candidate_sim_dir, ignore_errors=True)
+        except Exception:
+            pass
 
     return _log_performance_check("stage2", program_path, EvaluationResult(
         metrics={
             "stage2_passed": 1.0 if passed else 0.0,
             "combined_score": 1.0 if passed else -200.0,
-            "cost_savings": 0.0,
+            "cost_savings": stage2_cost_savings,
             "churn_stability": 0.0,
             "realism_resilience": 0.0,
             "stage2_misses": float(total_misses),
@@ -377,30 +386,42 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def evaluate_stage3(program_path: str) -> EvaluationResult:
-    """Stage 3: Full Dual-Tier Benchmark computing definitive J_v5 fitness."""
-    # ── Tier 1: Canonical 13 Regimes (T_init = 1.0s) ─────────────────────────
-    canonical_results = []
-    for regime in ALL_CANONICAL_REGIMES:
-        res = _run_single_simulation(regime, program_path, startup_delay_s=1.0, seed=42, run_dir_tag="canon")
-        if res is not None:
-            canonical_results.append(res)
-        else:
-            return _log_performance_check("stage3", program_path, EvaluationResult(
-                metrics={"combined_score": -1000.0, "cost_savings": -100.0},
-                artifacts={"error": f"Canonical simulation failed on {regime}"},
-            ))
+    """Stage 3: Full Dual-Tier Benchmark computing definitive J_v5 fitness (parallelized)."""
+    canonical_tasks = [(regime, 1.0, "canon") for regime in ALL_CANONICAL_REGIMES]
+    realism_tasks = [(regime, delay, f"realism_{int(delay)}") for regime, delay in REALISM_SHOCK_BENCHMARKS]
+    all_tasks = canonical_tasks + realism_tasks
+
+    results_map: Dict[Tuple[str, float, str], dict] = {}
+    max_workers = min(4, os.cpu_count() or 2)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_task = {
+            executor.submit(_run_single_simulation, regime, program_path, delay, 42, tag): (regime, delay, tag)
+            for regime, delay, tag in all_tasks
+        }
+        for future in as_completed(future_to_task):
+            task = future_to_task[future]
+            try:
+                res = future.result()
+                if res is None:
+                    return _log_performance_check("stage3", program_path, EvaluationResult(
+                        metrics={"combined_score": -1000.0, "cost_savings": -100.0},
+                        artifacts={"error": f"Simulation failed on {task[0]} (delay={task[1]}s)"},
+                    ))
+                results_map[task] = res
+            except Exception as exc:
+                return _log_performance_check("stage3", program_path, EvaluationResult(
+                    metrics={"combined_score": -1000.0, "cost_savings": -100.0},
+                    artifacts={"error": f"Simulation exception on {task[0]}: {exc}"},
+                ))
+
+    canonical_results = [results_map[t] for t in canonical_tasks]
+    realism_results = [results_map[t] for t in realism_tasks]
 
     canon_misses = sum(r["deadline_misses"] for r in canonical_results)
     canon_cost = sum(r["worker_seconds"] for r in canonical_results)
     canon_deltas = sum(r["scaling_deltas"] for r in canonical_results)
     canon_max_p99 = max(r["p99_latency_s"] for r in canonical_results)
-
-    # ── Tier 2: Realism Shock Matrix (T_init in [15s, 50s, 150s, 300s]) ──────
-    realism_results = []
-    for regime, delay in REALISM_SHOCK_BENCHMARKS:
-        res = _run_single_simulation(regime, program_path, startup_delay_s=delay, seed=42, run_dir_tag=f"realism_{int(delay)}")
-        if res is not None:
-            realism_results.append(res)
 
     realism_misses = sum(r["deadline_misses"] for r in realism_results)
     realism_cost = sum(r["worker_seconds"] for r in realism_results)
@@ -465,11 +486,14 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         "fitness_j_v5": fitness_j,
     }
 
-    stem = Path(program_path).stem
-    candidate_sim_dir = EVOLUTION_OUTPUT_DIR / stem
-    if fitness_j < 30.0 and candidate_sim_dir.exists():
-        logger.info(f"Policy {stem} score {fitness_j:.2f} < 30.0 — pruning disposable simulation directory to preserve disk.")
-        shutil.rmtree(candidate_sim_dir, ignore_errors=True)
+    try:
+        stem = Path(program_path).stem
+        candidate_sim_dir = EVOLUTION_OUTPUT_DIR / stem
+        if fitness_j < 30.0 and candidate_sim_dir.exists():
+            logger.info(f"Policy {stem} score {fitness_j:.2f} < 30.0 — pruning disposable simulation directory to preserve disk.")
+            shutil.rmtree(candidate_sim_dir, ignore_errors=True)
+    except Exception as e:
+        logger.debug(f"Simulation cleanup ignored error: {e}")
 
     return _log_performance_check("stage3", program_path, EvaluationResult(
         metrics=metrics,
