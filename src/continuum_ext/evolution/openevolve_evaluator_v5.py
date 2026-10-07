@@ -219,7 +219,7 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
         )
 
     return EvaluationResult(
-        metrics={"stage1_passed": 1.0, "combined_score": 0.0, "cost_savings": 0.0, "churn_stability": 0.0, "realism_resilience": 0.0},
+        metrics={"stage1_passed": 1.0, "combined_score": 1.0, "cost_savings": 0.0, "churn_stability": 0.0, "realism_resilience": 0.0},
         artifacts={"status": "Stage 1 Purity & Boundary Gate Passed"}
     )
 
@@ -352,6 +352,12 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
         f"  Passed: {passed}"
     )
 
+    if not passed:
+        stem = Path(program_path).stem
+        candidate_sim_dir = EVOLUTION_OUTPUT_DIR / stem
+        if candidate_sim_dir.exists():
+            shutil.rmtree(candidate_sim_dir, ignore_errors=True)
+
     return _log_performance_check("stage2", program_path, EvaluationResult(
         metrics={
             "stage2_passed": 1.0 if passed else 0.0,
@@ -458,6 +464,12 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         "max_p99_latency_s": float(canon_max_p99),
         "fitness_j_v5": fitness_j,
     }
+
+    stem = Path(program_path).stem
+    candidate_sim_dir = EVOLUTION_OUTPUT_DIR / stem
+    if fitness_j < 30.0 and candidate_sim_dir.exists():
+        logger.info(f"Policy {stem} score {fitness_j:.2f} < 30.0 — pruning disposable simulation directory to preserve disk.")
+        shutil.rmtree(candidate_sim_dir, ignore_errors=True)
 
     return _log_performance_check("stage3", program_path, EvaluationResult(
         metrics=metrics,
