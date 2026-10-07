@@ -39,14 +39,21 @@ FIXED_CAPACITY_WORKER_SECONDS = 27_900.0
 
 def get_evolution_paths(version: str = "auto") -> tuple[Path, Path, Path, str]:
     if version == "auto":
+        v5_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v5"
         v3_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
         v2_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v2"
-        if (v3_dir / "openevolve_db").exists() or (v3_dir / "evolution_trace.jsonl").exists():
+        if (v5_dir / "openevolve_db").exists() or (v5_dir / "evolution_trace.jsonl").exists():
+            chosen_dir = v5_dir
+            ver_label = "v5 Realism-Aware"
+        elif (v3_dir / "openevolve_db").exists() or (v3_dir / "evolution_trace.jsonl").exists():
             chosen_dir = v3_dir
             ver_label = "v3 Cost-Supreme"
         else:
             chosen_dir = v2_dir
             ver_label = "v2 Cost-First"
+    elif version in ("5", "v5"):
+        chosen_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v5"
+        ver_label = "v5 Realism-Aware"
     elif version in ("3", "v3"):
         chosen_dir = WORKSPACE_ROOT / "output" / "evolution_runs_v3"
         ver_label = "v3 Cost-Supreme"
@@ -104,10 +111,10 @@ def load_programs_from_trace(trace_file: Path) -> List[Dict[str, Any]]:
     return programs
 
 
-def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False, version: str = "auto"):
+def export_top_variants(top_n: int = 30, clean_sim_logs: bool = False, version: str = "auto"):
     evolution_dir, db_programs_dir, trace_file, ver_label = get_evolution_paths(version)
-    output_dir = WORKSPACE_ROOT / "output" / "top20_variants"
-    tarball_output = WORKSPACE_ROOT / "top20_evolved_variants.tar.gz"
+    output_dir = WORKSPACE_ROOT / "output" / f"top{top_n}_variants"
+    tarball_output = WORKSPACE_ROOT / "evolution_v5_results_bundle.tar.gz"
 
     print("=" * 70)
     print(f" EXPORTING TOP {top_n} EVOLVED VARIANTS ({ver_label})")
@@ -142,7 +149,7 @@ def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False, version: 
     )
 
     top_variants = sorted_programs[:top_n]
-    print(f"  ✓ Selected top {len(top_variants)} unique programs (highest fitness J_v2).")
+    print(f"  ✓ Selected top {len(top_variants)} unique programs (highest fitness).")
 
     # 3. Create output directory
     if output_dir.exists():
@@ -158,13 +165,14 @@ def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False, version: 
         m = p.get("metrics", {})
         score = float(m.get("combined_score", 0.0))
         cost_savings = float(m.get("cost_savings", 0.0))
-        misses = int(m.get("deadline_misses", 0))
+        canon_misses = int(m.get("canonical_misses", m.get("deadline_misses", 0)))
+        shock_misses = int(m.get("realism_misses", 0))
+        resilience = float(m.get("realism_resilience", max(0.0, 3000.0 - shock_misses)))
         p99 = float(m.get("max_p99_latency_s", 0.0))
         wsec = float(m.get("worker_seconds", 0.0))
         deltas = int(m.get("scaling_deltas", 0))
         completed = int(m.get("completed_requests", 0))
 
-        # Format clean filename: rank01_fit+26.01_id085265b3.py
         score_tag = f"{score:+.2f}".replace(".", "p")
         filename = f"rank{rank:02d}_fit{score_tag}_id{pid_short}.py"
         file_path = output_dir / filename
@@ -173,18 +181,19 @@ def export_top_variants(top_n: int = 20, clean_sim_logs: bool = False, version: 
 Policy Rank:        #{rank} of {len(top_variants)}
 Program ID:         {pid}
 Discovered In:      Iteration {p.get("iteration_found", "N/A")}
-Fitness J_v2:       {score:+.4f}
+Fitness (Score):    {score:+.4f}
 
-Performance Profile (Authoritative 13-Regime Benchmark):
-  - Cost Savings:       {cost_savings:.2f}% vs Fixed Capacity
-  - Provisioned Cost:   {wsec:.1f} worker-seconds (Target: beat InferLine 14,261 ws)
-  - Deadline Misses:    {misses}
-  - Max P99 Latency:    {p99:.2f}s (SLA: 15.0s, Target: <= 5.0s)
-  - Scaling Flapping:   {deltas} deltas
-  - Completed Requests: {completed:,}
+Performance Profile:
+  - Cost Savings:         {cost_savings:.2f}% vs Fixed Capacity Peak (27,900 ws)
+  - Canonical Cost:       {wsec:.1f} worker-seconds (Target: beat InferLine 14,261 ws)
+  - Canonical Misses:     {canon_misses} (Strict Floor: 0 misses)
+  - Realism Shock Misses: {shock_misses} (Extreme T_init in [15s, 50s, 150s, 250s, 300s])
+  - Realism Resilience:   {resilience:.1f}
+  - Max P99 Latency:      {p99:.2f}s
+  - Scaling Deltas:       {deltas} deltas
 
 Mutation Rationale:
-  {(p.get("changes_description") or "Initial champion seed candidate").replace(chr(10), " ")}
+  {(p.get("changes_description") or "Initial seed candidate").replace(chr(10), " ")}
 """
 
 '''
@@ -195,37 +204,49 @@ Mutation Rationale:
             "rank": rank,
             "filename": filename,
             "program_id": pid_short,
-            "fitness_j_v2": round(score, 4),
+            "fitness_score": round(score, 4),
             "cost_savings_%": round(cost_savings, 2),
             "worker_seconds": round(wsec, 1),
-            "deadline_misses": misses,
+            "canon_misses": canon_misses,
+            "shock_misses": shock_misses,
+            "realism_resilience": round(resilience, 1),
             "max_p99_s": round(p99, 3),
             "scaling_deltas": deltas,
             "beats_inferline_cost": wsec < 14261.0 and wsec > 0,
-            "zero_misses": misses == 0,
+            "zero_canon_misses": canon_misses == 0,
         })
 
     # 5. Write Leaderboard CSV
-    csv_path = output_dir / "TOP20_LEADERBOARD.csv"
+    csv_path = output_dir / f"TOP{top_n}_LEADERBOARD.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(leaderboard_rows[0].keys()))
         writer.writeheader()
         writer.writerows(leaderboard_rows)
 
     # 6. Write Leaderboard Markdown
-    md_path = output_dir / "TOP20_LEADERBOARD.md"
+    md_path = output_dir / f"TOP{top_n}_LEADERBOARD.md"
     md_lines = [
         f"# Top {len(top_variants)} Discovered Autoscaling Policies ({ver_label})",
         "",
-        "Objective: $J = \\text{cost\\_savings\\_\\%} - \\left(2.0 \\cdot \\min(M, 50) + 10.0 \\cdot \\max(0, M - 50)\\right) - 10.0 \\cdot \\max(0.0, P99 - \\text{threshold}) - 0.01 \\cdot \\Delta$",
+        "Dual-Tier Objective: $J_{\\text{v5}} = \\text{CostSavings\\%} - 100 \\cdot M_{\\text{canon}} - 0.02 \\cdot M_{\\text{shock}} - \\text{ChurnPenalty}$",
         "",
-        "| Rank | File | Program ID | Fitness $J$ | Cost Savings | Worker-Sec | Misses | Max P99 | Deltas | Status |",
-        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
+        "| Rank | File | Program ID | Fitness $J$ | Cost Savings | Worker-Sec | Canon Miss | Shock Miss | Resilience | Deltas | Status |",
+        "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |",
     ]
     for r in leaderboard_rows:
-        status = "★ Beats InferLine Cost" if r["beats_inferline_cost"] else ("✓ Zero Misses" if r["zero_misses"] else "Pareto Candidate")
+        if r["shock_misses"] < 500 and r["zero_canon_misses"]:
+            status = "★ Realism Master"
+        elif r["beats_inferline_cost"] and r["zero_canon_misses"]:
+            status = "✓ Beats InferLine Cost"
+        elif r["zero_canon_misses"]:
+            status = "✓ Zero Canon Misses"
+        else:
+            status = "Pareto Candidate"
+
         md_lines.append(
-            f"| {r['rank']} | `{r['filename']}` | `{r['program_id']}` | **{r['fitness_j_v2']:+.2f}** | {r['cost_savings_%']:.2f}% | {r['worker_seconds']} ws | {r['deadline_misses']} | {r['max_p99_s']}s | {r['scaling_deltas']} | {status} |"
+            f"| {r['rank']} | `{r['filename']}` | `{r['program_id']}` | **{r['fitness_score']:+.2f}** | "
+            f"{r['cost_savings_%']:.2f}% | {r['worker_seconds']} ws | {r['canon_misses']} | "
+            f"{r['shock_misses']} | {r['realism_resilience']} | {r['scaling_deltas']} | {status} |"
         )
     md_lines.append("")
     with open(md_path, "w", encoding="utf-8") as f:
@@ -236,12 +257,14 @@ Mutation Rationale:
 
     # 7. Copy auxiliary lightweight reporting files if they exist
     aux_files = [
+        WORKSPACE_ROOT / "output" / "evolved_policy_v5.py",
         WORKSPACE_ROOT / "output" / "evolved_policy_v3.py",
         WORKSPACE_ROOT / "output" / "evolved_policy_v2.py",
+        WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V5.md",
         WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V3.md",
-        WORKSPACE_ROOT / "docs" / "EVOLVED_ALGORITHMS_DISCOVERY_LOG_V2.md",
         evolution_dir / "algorithm_performance_log.csv",
         evolution_dir / "llm_calls_log.csv",
+        evolution_dir / "token_churn_summary.json",
         evolution_dir / "evolution_trace.jsonl",
     ]
     for af in aux_files:
@@ -249,9 +272,9 @@ Mutation Rationale:
             shutil.copy(str(af), str(output_dir / af.name))
             print(f"  ✓ Bundled auxiliary file: {af.name}")
 
-    # 8. Create compressed tarball (< 2MB)
+    # 8. Create compressed tarball (< 3MB)
     with tarfile.open(tarball_output, "w:gz") as tar:
-        tar.add(str(output_dir), arcname="top20_variants")
+        tar.add(str(output_dir), arcname=f"top{top_n}_variants")
 
     tar_size_kb = tarball_output.stat().st_size / 1024
     tar_size_mb = tar_size_kb / 1024
@@ -259,7 +282,7 @@ Mutation Rationale:
     print("=" * 70)
     print(f" PACKAGING COMPLETE!")
     print(f"  Output Tarball: {tarball_output}")
-    print(f"  Tarball Size:   {size_str} (bypassed 18GB of temporary simulation logs!)")
+    print(f"  Tarball Size:   {size_str} (lightweight bundle for download!)")
     print("=" * 70)
 
     # 9. Optional: Clean disposable simulation logs if requested
@@ -267,7 +290,7 @@ Mutation Rationale:
         print(f"\n[CLEANUP] Cleaning temporary simulation directories in {evolution_dir.name}...")
         freed_bytes = 0
         for item in evolution_dir.iterdir():
-            if item.is_dir() and (item.name.startswith("tmp") or item.name.startswith("seed_policy")):
+            if item.is_dir() and (item.name.startswith("tmp") or item.name.startswith("seed_policy") or "suite" in item.name):
                 try:
                     size = sum(f.stat().st_size for f in item.glob("**/*") if f.is_file())
                     shutil.rmtree(str(item), ignore_errors=True)
@@ -280,9 +303,9 @@ Mutation Rationale:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export top discovered policies into a lightweight tarball.")
-    parser.add_argument("--top", type=int, default=20, help="Number of top variants to export (default: 20)")
-    parser.add_argument("--clean-sim-logs", action="store_true", help="Delete disposable tmp* simulation folders to free disk space")
-    parser.add_argument("--version", type=str, default="auto", choices=["auto", "2", "v2", "3", "v3"], help="Run version to export (default: auto)")
+    parser.add_argument("--top", type=int, default=30, help="Number of top variants to export (default: 30)")
+    parser.add_argument("--clean-sim-logs", action="store_true", help="Delete disposable simulation folders to free disk space")
+    parser.add_argument("--version", type=str, default="auto", choices=["auto", "2", "v2", "3", "v3", "5", "v5"], help="Run version to export (default: auto)")
     args = parser.parse_args()
 
     export_top_variants(top_n=args.top, clean_sim_logs=args.clean_sim_logs, version=args.version)

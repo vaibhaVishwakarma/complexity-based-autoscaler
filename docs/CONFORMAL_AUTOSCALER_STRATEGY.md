@@ -548,23 +548,32 @@ flowchart TD
 
 ## 12. Physical Realism, Multi-Scale Cold Starts & Scale-Gap Bridging Architecture (Step 8.5)
 
-### 12.1 Bridging the Physical Realism Gap
-While the canonical 13-regime benchmark validated the core algorithmic thesis under controlled conditions (Step 8), real-world edge-cloud systems serving vision backbones, multimodal networks, and foundation models (VLMs/LLMs) encounter complex physical delays:
-1. **Multi-Scale Container & Model Initialization**: In production cloud clusters, model spin-up delay varies across orders of magnitude:
-   - **MicroVM Memory Snapshot Restore (Firecracker / SnapStart / CRIU)**: $T_{\text{boot}} \approx 0.5\text{s} - 1.0\text{s}$.
-   - **Standard Container Cold Start (PyTorch / CUDA runtime context init)**: $T_{\text{boot}} \approx 5.0\text{s} - 15.0\text{s}$.
-   - **Medium Vision Backbone Pull (ResNet-152, ViT-Base on un-cached host)**: $T_{\text{boot}} \approx 50.0\text{s} - 100.0\text{s}$.
-   - **Heavy Foundation Model / VLM Extreme Init (7B–70B VLM, multi-GPU NCCL tensor-parallel synchronization, CUDA graph compilation)**: $T_{\text{boot}} \approx 150.0\text{s} - 300.0\text{s}$ (up to 5 minutes).
-2. **Smooth, Non-Impulsive Delay Progression**: Rather than arbitrary jumps, sensitivity is mapped across a smooth parametric ladder:
-   $$T_{\text{boot}} \in [0.5\text{s}, 1.0\text{s}, 5.0\text{s}, 15.0\text{s}, 50.0\text{s}, 100.0\text{s}, 150.0\text{s}, 200.0\text{s}, 250.0\text{s}, 300.0\text{s}]$$
-3. **Unified Enterprise Elasticity ($k_{\min} \ge 1$)**: All controllers maintain a baseline warm capacity ($k_{\min} = 1$), eliminating the degenerate clutter of scale-to-zero initial waiting times and focusing strictly on the **elastic surge expansion envelope** ($k \in [1, 18]$) when sudden traffic bursts hit.
-4. **Dynamic GPU Batching Execution Profile**: Triton Inference Server execution time scales non-linearly with batch size $b \in [1, 16]$:
+### 12.1 Bridging the Physical Realism Gap: Model Functional Initialization Latency ($T_{\text{init}}$)
+While the canonical 13-regime benchmark validated the core algorithmic thesis under sub-second conditions (Step 8), real-world edge-cloud systems serving vision backbones, multimodal networks, and foundation models (VLMs/LLMs) encounter complex physical initialization delays.
+
+#### Systems Terminology & Physical Realism ($T_{\text{pod}}$ vs. $T_{\text{init}}$)
+In systems literature and production cloud serving (e.g., AWS SageMaker, Azure ML, Triton Inference Server, vLLM), it is critical to distinguish between raw container provisioning and full model readiness:
+- **Raw Container/Pod Booting ($T_{\text{pod}} \approx 5\text{s} - 20\text{s}$)**: The time required for Kubernetes to schedule a pod, download base container layers, and reach the `Running` state.
+- **Model Functional Initialization Latency ($T_{\text{init}} \approx 15\text{s} - 300\text{s}$)**: The true multi-minute dead-time bottleneck before an instance can serve inference traffic. This encompasses:
+  1. *Model Weight Streaming* ($T_{\text{weights}}$): Pulling 5 GB – 30 GB of checkpoint weights from blob storage (S3/Azure Blob/registry) across the network.
+  2. *CUDA Context & Driver Binding* ($T_{\text{cuda}}$): Allocating GPU VRAM, initializing driver contexts, and initializing CUDA graphs.
+  3. *Engine Optimization & Graph Compilation* ($T_{\text{engine}}$): Compiling TensorRT execution plans or ONNX runtime sessions.
+  4. *Inference Warmup* ($T_{\text{warmup}}$): Executing dummy evaluation batches to page in tensors and prevent first-token latency degradation.
+
+$$\text{Total Service Readiness Delay: } T_{\text{init}} = T_{\text{pod}} + T_{\text{weights}} + T_{\text{cuda}} + T_{\text{engine}} + T_{\text{warmup}} \in [0.5\text{s} \to 300\text{s}]$$
+
+In the simulation harness, $T_{\text{init}}$ maps directly to ContinuumBench's native `startup_delay_s` parameter on worker pools.
+
+#### The Physical Realism Dimensions:
+1. **Smooth, Non-Impulsive Initialization Ladder**:
+   $$T_{\text{init}} \in [0.5\text{s}, 1.0\text{s}, 5.0\text{s}, 15.0\text{s}, 50.0\text{s}, 100.0\text{s}, 150.0\text{s}, 200.0\text{s}, 250.0\text{s}, 300.0\text{s}]$$
+   Covering the full spectrum from microVM memory snapshot restores (Firecracker/SnapStart at 0.5s) to heavy multi-minute foundation model cold starts (250s–300s).
+2. **Unified Enterprise Elasticity ($k_{\min} \ge 1$)**: All controllers maintain a baseline warm capacity ($k_{\min} = 1$), eliminating artificial scale-to-zero queue traps and focusing strictly on the **elastic surge expansion envelope** ($k \in [1, 18]$) when sudden traffic bursts hit.
+3. **Dynamic GPU Batching Execution Profile**: Triton Inference Server execution time scales non-linearly with batch size $b \in [1, 16]$:
    $$\mu(B) = \frac{B}{T_{\text{base}} + \beta \cdot B}$$
-   where $T_{\text{base}} = 0.015\text{s}$ and $\beta = 0.006\text{s}$ (derived from Gate 2 Tesla T4 profiling).
-5. **Calibrated WAN Batch Link**: Network transmission latency is modeled as a function of batched payload volume and link bandwidth:
-   $$T_{\text{net}} = \text{RTT} + \frac{B \cdot S_{\text{bytes}}}{\text{Bandwidth}}$$
-   incorporating stochastic packet jitter ($\mu = 42\text{ms}, \sigma = 8\text{ms}$) under constrained cellular/broadband uplinks ($150\text{ Mbps}$).
-6. **Macro-Horizon Benchmark Scaling (1,800s Azure Production Trace)**: To evaluate multi-minute cold starts ($T_{\text{boot}} \ge 50\text{s}$), the simulation window is expanded to 1,800 seconds (30 minutes) using continuous rolling slices from our 14-day production Azure Functions trace dataset (`data/azure_traces/azure_functions_2019_processed.npz`).
+   where $T_{\text{base}} = 0.0091\text{s}$ and $\beta = 0.0061\text{s}$ (derived from Gate 2 Tesla T4 profiling).
+4. **Calibrated WAN Batch Link**: Grounded in ContinuumBench F2 `edge_cloud_wan` profile (median 42ms RTT, 150 Mbps bandwidth, 0.2% packet loss).
+5. **Macro-Horizon Benchmark Scaling (1,800s Azure Production Trace)**: Evaluates multi-minute cold starts over 30-minute operational spans using continuous rolling slices from our 14-day production Azure Functions trace dataset (`data/azure_traces/azure_functions_2019_processed.npz`).
 
 ### 12.2 ContinuumBench Framework Native Alignment Audit
 A comprehensive audit of ContinuumBench documentation and source code confirms that all proposed directions are natively supported by the benchmark harness:
@@ -573,89 +582,96 @@ A comprehensive audit of ContinuumBench documentation and source code confirms t
 - **Calibrated Network Profiles (`calibration_profiles.py:25-40`)**: ContinuumBench's `F2` evaluation regime natively loads `network_profiles.yaml` (`edge_cloud_wan`).
 - **Controller Extensibility (`controllers/README.md:48-53`)**: Explicitly endorses custom controllers via `extensions_local.py` / `src/continuum_ext/` without altering core benchmark code.
 
-### 12.3 Multi-Horizon Conformal Lookahead & Closed-Loop Edge Fallback
-To maintain SLA stability when cold-boot dead times reach $50\text{s}-300\text{s}$, the conformal autoscaler incorporates:
-1. **Multi-Horizon Demand Projection**:
-   $$\hat{\lambda}_{\text{cloud}}(t + T_{\text{boot}}) = \lambda_{\text{cloud}}(t) + T_{\text{boot}} \cdot \frac{d\lambda_{\text{cloud}}}{dt}$$
-2. **In-Flight Booting Accounting**:
-   $$\text{target} = \max\left(1, \left\lceil \frac{\hat{\lambda}_{\text{cloud}}(t + T_{\text{boot}})}{\mu(B)} + \text{drain} - (\text{booting\_workers} \times 0.95) \right\rceil\right)$$
-3. **Closed-Loop Edge Fallback Feedback**: When cloud queue delay plus cold-boot lag exceeds the interactive deadline budget ($\text{Queue\_Delay}(t) + T_{\text{boot}} > D_{\text{SLA}}$), the controller signals the edge to degrade to local low-confidence inference rather than queuing poison tasks for a delayed cloud worker.
-
-### 12.4 Plan B: Contingency & Recovery Architecture for Extreme Boot Latencies ($T_{\text{boot}} \ge 50\text{s}$)
-To ensure scientific rigor and prevent operational chaos in the workspace, we define an explicit **Plan B Recovery Architecture** beforehand in the event that the direct evaluation of Evolved Policy v3 (`bbd9b1c2`) degrades under multi-minute cold starts ($T_{\text{boot}} \in [50\text{s}, 300\text{s}]$):
-
-#### 1. Anticipated Vulnerability of Policy v3 under Long Horizons
-Policy v3 was evolved under the canonical 80-second benchmark where $T_{\text{boot}} = 1.0\text{s}$. Its parameters are optimized for sub-second actuation:
-- Static queue drain window: $\text{DRAIN\_WINDOW\_S} = 2.08\text{s}$.
-- Static hysteresis cooldown: $\text{time\_since\_last\_scale\_s} < 2.2\text{s}$.
-- Static booting worker credit: $\text{raw\_target} = \text{demand} + \text{drain} - (\text{booting\_workers} \times 0.95)$.
-
-When $T_{\text{boot}}$ scales to $100\text{s}-300\text{s}$, subtracting $0.95 \times \text{booting\_workers}$ for up to 5 minutes may suppress necessary intermediate scale-up actions, causing queue latency buildup.
-
-#### 2. The Four-Tier Plan B Defense-in-Depth
-If Policy v3 exhibits tail latency degradation or deadline misses as $T_{\text{boot}} \to 300\text{s}$, the system immediately activates Plan B:
-1. **Tier B.1: Parametric Horizon Scaling (`src/continuum_ext/controllers/plan_b_adaptive_conformal.py`)**:
-   Dynamically scales control parameters with operational $T_{\text{boot}}$:
-   $$\tau_{\text{drain}}(T_{\text{boot}}) = \max(2.08, \gamma \cdot \sqrt{T_{\text{boot}}})$$
-   $$\text{cooldown}(T_{\text{boot}}) = \max(2.2, \delta \cdot T_{\text{boot}})$$
-   Replaces the static $0.95$ booting discount with elapsed boot progress tracking:
-   $$\text{effective\_booting} = \sum_{w \in \text{booting}} \max\left(0, 1 - \frac{t - t_{\text{start}}(w)}{T_{\text{boot}}}\right)$$
-2. **Tier B.2: Second-Order Conformal Acceleration**:
-   Adds arrival acceleration $\frac{d^2\lambda_{\text{cloud}}}{dt^2}$ to the demand lookahead to trigger scaling before exponential surges peak:
-   $$\hat{\lambda}_{\text{cloud}}(t + T_{\text{boot}}) = \lambda_{\text{cloud}}(t) + T_{\text{boot}} \frac{d\lambda_{\text{cloud}}}{dt} + \frac{1}{2} T_{\text{boot}}^2 \frac{d^2\lambda_{\text{cloud}}}{dt^2}$$
-3. **Tier B.3: Closed-Loop Edge Fallback (The Hard SLA Safety Net)**:
-   When cloud queue wait plus boot lag exceeds the deadline budget ($\frac{Q(t)}{k \mu} + T_{\text{boot}} > D_{\text{SLA}}$), the edge router closes the cloud gate and serves ambiguous tasks locally using the edge student model with graceful confidence degradation. This mathematically guarantees **zero SLA violations** regardless of boot latency magnitude.
-4. **Tier B.4: Branch-Isolated Evolutionary Re-adaptation (Branch `v4-evolution`)**:
-   If automated genetic re-synthesis is required, OpenEvolve executes strictly on the isolated branch `v4-evolution` (`b32438c`) using the macro-realism evaluator. All candidate variants and logs are contained within `output/v4_evolution_runs/`. The `main` branch remains clean and untouched.
-
-#### 3. Strict Workspace Governance ("Anti-Mess" Directive)
-To prevent directory pollution and messy refactoring loops:
-- No ad-hoc, untracked scripts in the root directory.
-- All Plan B code is centralized in [`src/continuum_ext/controllers/plan_b_adaptive_conformal.py`](file:///home/vaibo/edgecompute/src/continuum_ext/controllers/plan_b_adaptive_conformal.py).
-- All Plan B evaluation outputs are routed to [`output/realism_stress_results/plan_b/`](file:///home/vaibo/edgecompute/output/realism_stress_results/plan_b/) with typed JSON manifests.
-- The certified Step 8 dataset in `output/step8_multiseed_runs_v3/` remains immutable.
+### 12.3 Empirical Findings from Step 8.5 Sensitivity Sweep
+The complete 120-run sensitivity sweep across the 10-point initialization ladder ($0.5\text{s} \to 300\text{s}$) revealed the exact physical operational boundaries of all controllers (documented in [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md)):
+1. **Diurnal Production Resilience (`suite3_azure`)**:
+   Evolved Conformal v3 maintained **strict zero deadline misses across the entire ladder up to $T_{\text{init}} = 300.0\text{s}$ (5 minutes)** with P99 latency $\le 9.0\text{s}$, while saving $>57\%$ cost vs. HPA and cutting flapping by $>80\%$ vs. InferLine. In contrast, HPA and KEDA collapsed at $T_{\text{init}} \ge 15.0\text{s}$ (>1,700 misses).
+2. **Poisson Burst Containment (`suite1_spike`)**:
+   Evolved Conformal v3 maintained **zero deadline misses up to $T_{\text{init}} = 50.0\text{s}$** ($50\times$ its synthesis setting). Its physical tipping point occurred at $100\text{s}$.
+3. **The Opposing Semantic Shock Gap (`suite2_shock`)**:
+   While Policy v3 preserved zero misses through $T_{\text{init}} = 5.0\text{s}$ and only 11 misses at $15.0\text{s}$ (P99 = 14.0s), it suffered 1,939 to 2,379 misses when $T_{\text{init}} \ge 50.0\text{s}$. Under this extreme dead time, HPA and KEDA suffered 1,371 misses because they lack drain damping and booting discounts, slamming to max capacity ($k=18$) by default.
 
 ---
 
-## 13. Chronological Execution Roadmap & Verification Checklist
+## 13. Final Realism-Aware Evolutionary Synthesis (Step 8.6 / Version 5)
 
-To maintain methodological rigor, execution proceeds through the revised 10-step sequence:
+To eliminate the performance gap on `suite2_shock` under extreme model initialization delays without regressing on our certified Step 8 advantages over InferLine, we execute **Step 8.6: Realism-Aware Evolutionary Synthesis (v5)**.
 
-| Step | Milestone | Execution Action | Output Artifact | Status |
-|:---:|:---|:---|:---|:---:|
-| **1** | **Provenance & Contracts** | Verify `contracts/gate1.py` and `contracts/gate2.py` against local manifests | Verified Pydantic contracts | ✅ **PASS** |
-| **2** | **Workload Synthesizers** | Implement 2D generators for Suite 1, 2, and 3 in `continuum_bench/workload/` | `configs/suites/*.yaml` (13 regimes) | ✅ **PASS** |
-| **3** | **InferLine Replication** | Implement Algorithms 1–4 from ACM SoCC '20 in `continuum_bench/controllers/` | `inferline_controller.py` & baseline profile | ✅ **PASS** |
-| **4** | **Candidate Controllers** | Implement Fixed, Queue-Threshold, HPA, Blind Predictive, Conformal | `autoscaler_controllers.py` | ✅ **PASS** |
-| **5** | **Authoritative Baseline Runs** | Run baselines (Fixed, HPA, KEDA, InferLine) across all 13 regimes | `output/suite_baselines_runs/` | ✅ **PASS** |
-| **6** | **OpenEvolve Evaluator** | Cascade evaluator with Cost-Supreme objective ($J_{v3}$) | `src/continuum_ext/evolution/openevolve_evaluator_v3.py` | ✅ **PASS** |
-| **7** | **Evolutionary Synthesis** | Synthesized Global Champion `bbd9b1c2` (57.44% savings, 0 misses, 228 deltas) | `output/evolved_policy_v3.py` | ✅ **PASS** |
-| **8** | **Multi-Seed Statistical Validation** | Evaluated 20 held-out seeds (`1042-1061`) $\times$ 13 regimes $\times$ 5 controllers ($1,300$ runs). Certified zero misses ($p < 10^{-35}$), 51.51% cost savings ($p < 10^{-14}$), 76.7% churn reduction ($p < 10^{-43}$) vs InferLine | [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md) | ✅ **PASS** |
-| **8.5** | **Physical Realism & Scale-Gap Bridging** | Execute smooth cold-start sweep ($0.5\text{s} \to 300\text{s}$), dynamic GPU batching, calibrated WAN, and 1,800s Azure macro-trace under unified $k \ge 1$ baseline | [`docs/PLAN_COMPREHENSIVE_REALISM_AND_GAPS.md`](file:///home/vaibo/edgecompute/docs/PLAN_COMPREHENSIVE_REALISM_AND_GAPS.md) & `output/realism_stress_results/` | 🟡 **ACTIVE** |
-| **9** | **Final Validation & Plots** | Generate publication-grade Pareto frontiers, multi-seed distributions, and sensitivity curves | `output/plots/` & paper figures | 🚀 **READY** |
-| **10** | **Manuscript Writing & Review** | Draft full paper targeting USENIX ATC / ACM SoCC / EuroSys | `manuscript/` & referee reports | ⏳ **PENDING** |
+### 13.1 Problem Formulation & Root Cause Analysis
+In `evolved_policy_v3.py`, two mathematical terms tuned for $T_{\text{init}} = 1.0\text{s}$ create vulnerability under multi-minute delays ($T_{\text{init}} \in [15\text{s}, 300\text{s}]$):
+1. **The Static Booting Discount Trap**:
+   $$\text{raw\_target} = \text{demand} + \text{drain} - (\text{booting\_workers} \times 0.95)$$
+   When weights pull and GPU engine setup takes 150s–300s, workers remain in `booting_workers` for hundreds of epochs. Subtracting $0.95 \times \text{booting}$ for 5 minutes **suppresses emergency scale-up actions** while incoming requests flood the queue.
+2. **Fixed Drain Window Damping**:
+   $$\text{drain\_workers} = \frac{Q + 0.04 \frac{dQ}{dt}}{\mu \cdot 2.08\text{s}}$$
+   A $2.08\text{s}$ drain horizon is optimal for steady-state traffic, but when $T_{\text{init}} = 250\text{s} - 300\text{s}$ and $p_{\text{fast}}$ collapses to 10%, the slow-path demand requires faster pre-emption before queues reach the $15.0\text{s}$ deadline.
+
+### 13.2 The v5 Dual-Tier Fitness Function ($J_{v5}$)
+Evolution v5 optimizes a multi-tier composite objective combining canonical stability with extreme delay resilience:
+
+$$J_{v5} = \underbrace{\text{CostSavings}_{\text{canonical}}}_{\ge 50\% \text{ vs Fixed Peak}} - \underbrace{\Phi(\text{Misses}_{\text{canonical}})}_{\text{Hard Preservation Gate}} - \underbrace{\Psi(\text{Misses}_{\text{realism\_shock}})}_{\text{Multi-Minute Delay Optimization}} - \underbrace{0.01 \cdot \text{Deltas}}_{\text{Actuation Stability}}$$
+
+Where:
+- **Tier 1: Canonical Preservation Gate ($\Phi$)**: Evaluated across the 13 canonical regimes at $T_{\text{init}} = 1.0\text{s}$. Imposes a catastrophic penalty ($-100$ per miss) on any regression. Enforces that candidates strictly beat InferLine on cost ($< 14,261\text{ ws}$) and flapping ($< 855\text{ deltas}$).
+- **Tier 2: Realism Shock Optimization ($\Psi$)**: Evaluates candidates under extreme model initialization delays:
+  - `suite2_shock` under $T_{\text{init}} \in \{15.0\text{s}, 50.0\text{s}, 150.0\text{s}, 250.0\text{s}, 300.0\text{s}\}$
+  - `suite1_spike` under $T_{\text{init}} \in \{50.0\text{s}, 150.0\text{s}, 300.0\text{s}\}$
+  - Directly penalizes deadline misses and queue overflow under delayed shocks.
+
+### 13.3 Mathematical Mechanisms Targeted for Discovery
+OpenEvolve v5 explores mutations of the causal scaling law to discover:
+1. **Queue-Conditioned Booting Credit**:
+   Instead of static $0.95 \times \text{booting}$, the booting credit is damped when queue velocity ($\frac{dQ}{dt} > 0$) or queue depth indicates impending deadline danger:
+   $$\text{credit} = \text{booting\_workers} \times \max\left(0.0, 0.95 - \beta \cdot \frac{dQ}{dt}\right)$$
+2. **Semantic Collapse Pre-emption**:
+   When edge fast-path triage collapses ($p_{\text{fast}} < 0.35$), the controller immediately expands demand headroom to establish cloud capacity before queues accumulate.
+
+### 13.4 Seed Policy & Lineage
+Evolution v5 is initialized directly with **Champion Policy v3 (`bbd9b1c2`)**, ensuring Generation 0 starts with $+55$ baseline fitness, zero canonical misses, and established Pareto dominance over InferLine.
+
+---
+
+## 14. Chronological Execution Roadmap & Verification Checklist
+
+To maintain methodological rigor, execution proceeds through the updated 11-step roadmap:
+
+| Track | Step | Milestone | Execution Action | Output Artifact | Status |
+|:---:|:---:|:---|:---|:---|:---:|
+| [x] | **1** | **Provenance & Contracts** | Verify `contracts/gate1.py` and `contracts/gate2.py` against local manifests | Verified Pydantic contracts | ✅ **PASS** |
+| [x] | **2** | **Workload Synthesizers** | Implement 2D generators for Suite 1, 2, and 3 in `continuum_bench/workload/` | `configs/suites/*.yaml` (13 regimes) | ✅ **PASS** |
+| [x] | **3** | **InferLine Replication** | Implement Algorithms 1–4 from ACM SoCC '20 in `continuum_bench/controllers/` | `inferline_controller.py` & baseline profile | ✅ **PASS** |
+| [x] | **4** | **Candidate Controllers** | Implement Fixed, Queue-Threshold, HPA, Blind Predictive, Conformal | `autoscaler_controllers.py` | ✅ **PASS** |
+| [x] | **5** | **Authoritative Baseline Runs** | Run baselines (Fixed, HPA, KEDA, InferLine) across all 13 regimes | `output/suite_baselines_runs/` | ✅ **PASS** |
+| [x] | **6** | **OpenEvolve Evaluator** | Cascade evaluator with Cost-Supreme objective ($J_{v3}$) | `src/continuum_ext/evolution/openevolve_evaluator_v3.py` | ✅ **PASS** |
+| [x] | **7** | **Evolutionary Synthesis** | Synthesized Global Champion `bbd9b1c2` (57.44% savings, 0 misses, 228 deltas) | `output/evolved_policy_v3.py` | ✅ **PASS** |
+| [x] | **8** | **Multi-Seed Statistical Validation** | Evaluated 20 held-out seeds (`1042-1061`) $\times$ 13 regimes $\times$ 5 controllers ($1,300$ runs). Certified zero misses ($p < 10^{-35}$), 51.51% cost savings ($p < 10^{-14}$), 76.7% churn reduction ($p < 10^{-43}$) vs InferLine | [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md) | ✅ **PASS** |
+| [x] | **8.5** | **Physical Realism & Scale-Gap Sweep** | Executed smooth delay ladder ($0.5\text{s} \to 300\text{s}$) across 120 runs; mapped $T_{\text{init}}^*$ tipping points | [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md) | ✅ **PASS** |
+| [ ] | **8.6** | **Realism-Aware Evolutionary Synthesis (v5)** | Run OpenEvolve v5 with dual-tier fitness $J_{v5}$ across canonical suites + delayed shock regimes ($15\text{s} \to 300\text{s}$) | `output/evolved_policy_v5.py` | 🟡 **ACTIVE** |
+| [ ] | **9** | **Final Multi-Seed Validation & Plots** | Execute 20-seed evaluation on Champion v5 across canonical + delayed suites; generate publication plots | `output/plots/` & paper figures | 🚀 **READY** |
+| [ ] | **10** | **Manuscript Writing & Review** | Draft full paper targeting USENIX ATC / ACM SoCC / EuroSys | `manuscript/` & referee reports | ⏳ **PENDING** |
 
 ---
 
 ## Current Status & Next Execution Phase
 
 ### Completed Milestones
-- **Steps 1 through 7** are complete, establishing empirical hardware grounding, 13 stress benchmark regimes, baseline evaluations, and the discovery of Evolved Policy v3 Champion (`bbd9b1c2`).
-- **Step 8 (Full 20-Seed Multi-Seed Statistical Validation)** is **COMPLETE and CERTIFIED**:
-  - $1,300$ total simulations executed across 20 held-out seeds (`1042..1061`).
-  - Strict zero deadline misses maintained across all 260 evaluation runs for Evolved Policy v3.
-  - Paired Wilcoxon Signed-Rank tests confirm statistical significance at $p < 10^{-14}$ for cost savings, actuation stability (churn), tail latency, and mean queue waiting times against InferLine.
-  - Comprehensive empirical report published in [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md).
+- **Steps 1 through 8** are complete, establishing empirical hardware grounding, 13 stress benchmark regimes, baseline evaluations, discovery of Champion v3 (`bbd9b1c2`), and full 20-seed statistical certification ($1,300$ runs, zero misses, $p < 10^{-14}$).
+- **Step 8.5 (Physical Realism & Scale-Gap Sensitivity Sweep)** is **COMPLETE and CERTIFIED**:
+  - 120 full simulations executed across the 10-point ladder ($0.5\text{s} \to 300.0\text{s}$) and stress triad.
+  - Certified zero misses on production Azure traces up to 300s ($T_{\text{init}}^* > 300\text{s}$).
+  - Mapped empirical tipping point on `suite2_shock` under long initialization delays.
+  - Published comprehensive empirical report in [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md).
 
-### Active Execution Phase: Step 8.5 (Physical Realism & Scale-Gap Bridging)
-We are actively executing **Step 8.5**:
-1. Implement the dynamic GPU batching model (`src/continuum_ext/realism/dynamic_batching_model.py`) and WAN batch link (`src/continuum_ext/realism/network_batch_link.py`).
-2. Configure the 1,800-second Azure macro-trace benchmark (`configs/suites/macro_azure_deep_trace.yaml`).
-3. Deploy the unified stress-suite runner (`scripts/run_realism_gap_stress_suite.py`) executing the smooth delay ladder ($0.5\text{s} \to 300\text{s}$) across all controllers with $k_{\min} = 1$.
+### Active Execution Phase: Step 8.6 (Realism-Aware Evolutionary Synthesis v5)
+- [ ] Implement dual-tier Evaluator v5 (`src/continuum_ext/evolution/openevolve_evaluator_v5.py`) with canonical floor gate and extreme delay shock evaluation ($T_{\text{init}} \in [15\text{s}, 50\text{s}, 150\text{s}, 250\text{s}, 300\text{s}]$).
+- [ ] Configure OpenEvolve v5 search spec (`configs/evolution/openevolve_config_v5.yaml`).
+- [ ] Benchmark Champion v3 baseline score on Evaluator v5.
+- [ ] Launch OpenEvolve v5 search to synthesize Champion v5 (`output/evolved_policy_v5.py`).
+- [ ] Certify that Champion v5 beats HPA/KEDA on `suite2_shock` while preserving zero misses on canonical 13 suites.
 
 ### Next Execution Phase: Step 9 (Publication Visualizations & Paper Figures)
-Following Step 8.5 data collection, we will execute **Step 9**:
-1. Generate the canonical multi-seed distribution comparison figure (Cost vs. Deadline Misses vs. Flapping) from Step 8.
-2. Generate the regime-by-regime Pareto frontier plot ($y$: SLA compliance %, $x$: total worker-seconds).
-3. Generate the physical sensitivity curves (Boot delay vs. SLA Misses & Tail Latency) from Step 8.5.
+- [ ] Generate the canonical multi-seed distribution comparison figure from Step 8.
+- [ ] Generate the regime-by-regime Pareto frontier plot ($y$: SLA compliance %, $x$: total worker-seconds).
+- [ ] Generate the physical sensitivity curves (Initialization delay $T_{\text{init}}$ vs. SLA Misses & Tail Latency) comparing Policy v3, Policy v5, InferLine, HPA, and KEDA.
+- [ ] Generate dual-panel time-series dynamics comparison plot under acute stress.
 

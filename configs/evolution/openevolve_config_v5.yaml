@@ -1,0 +1,191 @@
+# openevolve_config_v5.yaml — Step 8.6: Realism-Aware Evolutionary Synthesis Configuration
+# =========================================================================================
+#
+# Role:
+#   Master configuration for OpenEvolve v5 evolutionary search.
+#   Directives:
+#   1. CANONICAL FLOOR PRESERVATION: Maintain strict zero deadline misses across
+#      the 13 canonical benchmark regimes at T_init = 1.0s, keeping >= 50% cost savings.
+#   2. REALISM GAP BRIDGING: Overcome delayed semantic shocks (suite2_shock and suite1_spike)
+#      under extreme model initialization delays (T_init in [15s, 50s, 150s, 250s, 300s]).
+#   3. Target mathematical discoveries:
+#      - Queue-conditioned booting credit (suppressing the 95% discount when dQ/dt > 0 or Q is high).
+#      - Pre-emptive triage expansion when p_fast collapses below 0.35.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOP-LEVEL EVOLUTION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+max_iterations: 150
+checkpoint_interval: 1
+log_level: "INFO"
+random_seed: 42
+language: "python"
+file_suffix: ".py"
+
+diff_based_evolution: true
+enforce_evolve_blocks: true
+max_code_length: 25000
+
+early_stopping_patience: 40
+convergence_threshold: 0.01
+early_stopping_metric: "combined_score"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  models:
+    - name: "gemini-2.5-flash-lite"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.6
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-flash-lite-latest"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.3
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+    - name: "gemini-2.5-flash"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.1
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMPT CONFIGURATION (V5 REALISM-AWARE DIRECTIVES)
+# ─────────────────────────────────────────────────────────────────────────────
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  include_artifacts: true
+  max_artifact_bytes: 10240
+  suggest_simplification_after_chars: 4000
+
+  island_system_messages:
+    - |
+      You are an expert autoscaling researcher evolving the CORE REALISM CONFORMAL branch (Island 0).
+      Your primary mission: evolve a scaling law that PRESERVES ZERO MISSES on canonical workloads while ELIMINATING QUEUE OVERFLOW during extreme model initialization delays (T_init = 15s to 300s).
+
+      V5 Fitness Objective:
+        J_v5 = CostSavings_canon - 100.0 * Misses_canon - 10.0 * max(0, P99_canon - 6.0)
+               - 0.01 * Deltas_canon - 0.02 * Misses_realism_shocks + InferLineBonus
+
+        1. CANONICAL PRESERVATION IS MANDATORY:
+           Any deadline miss on the canonical 13 regimes incurs -100 points! You must keep canonical misses at ZERO.
+           Beat InferLine: keep canonical cost < 14,261 worker-seconds (+10 pt bonus).
+        2. OVERCOME THE 95% BOOTING DISCOUNT TRAP:
+           In your seed, raw_target subtracts (state.booting_workers * 0.95). When models take 50s-300s to initialize,
+           subtracting 0.95 for minutes suppresses emergency scale-up while queues overflow!
+           Target Discovery: Condition or damp the booting discount when queue velocity (state.cloud_queue_velocity > 0)
+           or backlog (state.cloud_queue_depth > 2) indicates impending deadline danger!
+        3. TAIL LATENCY: P99 up to 6.0s on canonical suites is penalty-free.
+
+      Format Requirement:
+      Keep explanation brief (1-2 sentences). You MUST immediately provide your modifications as one or more SEARCH/REPLACE blocks:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the CONTINUOUS COMPLEXITY DYNAMICS RADICAL (Island 1).
+      Your core mission: introduce predictive semantic collapse pre-emption to scale before multi-minute cold starts can cause deadline breaches.
+
+      V5 Fitness Objective:
+        J_v5 = CostSavings_canon - 100.0 * Misses_canon - 0.02 * Misses_realism_shocks - ChurnPenalty
+        1. Canonical misses must remain strictly ZERO (harsh -100 penalty per miss).
+        2. Realism delayed shock misses must be minimized (evaluated on suite2_shock and suite1_spike up to T_init = 300s).
+
+      Dynamic Signals in TelemetricState:
+      - state.p_fast: empirical acceptance ratio (|C(x)| = 1). When p_fast drops below 0.35, cloud demand surges 3x-9x!
+      - state.p_fast_velocity: dp_fast/dt. Steep negative velocity warns of an incoming semantic shock.
+      - state.cloud_queue_velocity: dQ/dt. Backlog acceleration.
+      - state.mean_set_size: classification ambiguity.
+
+      Design Directives for Island 1:
+      - When p_fast < 0.35 or p_fast_velocity < -0.15, immediately expand demand headroom to order capacity BEFORE queues grow.
+      - Never deduct booting workers if cloud_queue_velocity > 0 or oldest_task_age_s > 4.0s.
+      - Only use state.* attributes defined in TelemetricState. Return int k in [1, 18].
+
+      Format Requirement:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+    - |
+      You are an expert researcher evolving the ADAPTIVE QUEUE DAMPING RADICAL (Island 2).
+      Your core mission: discover dynamic queue draining laws that prevent queue buildup during multi-minute container initialization delays while maintaining > 53% cost savings.
+
+      V5 Fitness Objective:
+        J_v5 = CostSavings_canon - 100.0 * Misses_canon - 0.02 * Misses_realism_shocks - ChurnPenalty
+        1. Keep canonical 13 regimes at strict 0 misses.
+        2. Minimize delayed shock misses under T_init in [15s, 50s, 150s, 250s, 300s].
+
+      Design Directives for Island 2:
+      - Modulate DRAIN_WINDOW_S: During quiet periods, wide window (2.08s) saves cost. But when cloud_queue_depth > 5 or queue_velocity > 0, shorten the window dynamically to drain aggressively.
+      - Safeguard against booting delay starvation: if booting_workers > 0 and queue is growing, treat booting workers as non-contributing until they actually transition to active_workers.
+      - Only use state.* attributes defined in TelemetricState. Return int k in [1, 18].
+
+      Format Requirement:
+      <<<<<<< SEARCH
+      # exact lines from current code to replace
+      =======
+      # new replacement code
+      >>>>>>> REPLACE
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MAP-ELITES POPULATION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+database:
+  population_size: 50
+  archive_type: "map_elites"
+  feature_dimensions:
+    - name: "cost_savings"
+      min_val: 0.0
+      max_val: 70.0
+      bins: 14
+    - name: "churn_stability"
+      min_val: 0.0
+      max_val: 500.0
+      bins: 10
+    - name: "realism_resilience"
+      min_val: 0.0
+      max_val: 3000.0
+      bins: 12
+  mutation_rate: 0.8
+  crossover_rate: 0.2
+  tournament_size: 3
+  selection_strategy: "tournament"
+  num_islands: 3
+  migration_interval: 10
+  migration_rate: 0.1
