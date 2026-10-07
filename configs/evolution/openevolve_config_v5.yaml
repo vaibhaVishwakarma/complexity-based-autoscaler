@@ -163,29 +163,64 @@ prompt:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MAP-ELITES POPULATION SETTINGS
+# DATABASE CONFIGURATION (MAP-Elites Archive & Island Topology)
 # ─────────────────────────────────────────────────────────────────────────────
 
 database:
-  population_size: 50
-  archive_type: "map_elites"
-  feature_dimensions:
-    - name: "cost_savings"
-      min_val: 0.0
-      max_val: 70.0
-      bins: 14
-    - name: "churn_stability"
-      min_val: 0.0
-      max_val: 500.0
-      bins: 10
-    - name: "realism_resilience"
-      min_val: 0.0
-      max_val: 3000.0
-      bins: 12
-  mutation_rate: 0.8
-  crossover_rate: 0.2
-  tournament_size: 3
-  selection_strategy: "tournament"
+  in_memory: false
+  db_path: "output/evolution_runs_v5/openevolve_db"
+
+  population_size: 500
+  archive_size: 100
+
   num_islands: 3
-  migration_interval: 10
-  migration_rate: 0.1
+
+  elite_selection_ratio: 0.10
+  exploitation_ratio: 0.70
+  exploration_ratio: 0.20
+
+  feature_dimensions:
+    - "cost_savings"
+    - "churn_stability"
+    - "realism_resilience"
+  feature_bins: 10
+
+  migration_interval: 20
+  migration_rate: 0.10
+
+  random_seed: 42
+
+  log_prompts: true
+  enable_artifacts: true
+  cleanup_old_artifacts: false
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVALUATOR CONFIGURATION (Cascade Pipeline)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evaluator:
+  timeout: 300
+  cascade_evaluation: true
+  cascade_thresholds:
+    - 0.5
+    - 0.5
+
+  parallel_evaluations: 1
+  enable_artifacts: true
+  max_artifact_storage: 104857600
+  max_retries: 2
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVOLUTION TRACE LOGGING
+# ─────────────────────────────────────────────────────────────────────────────
+
+evolution_trace:
+  enabled: true
+  format: "jsonl"
+  include_code: true
+  include_prompts: true
+  output_path: "output/evolution_runs_v5/evolution_trace.jsonl"
+  buffer_size: 1
+  compress: false

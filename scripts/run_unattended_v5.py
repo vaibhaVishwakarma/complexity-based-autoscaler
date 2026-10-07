@@ -44,6 +44,15 @@ CHECKPOINTS_DIR = WORKSPACE_ROOT / "output" / "evolution_runs_v5" / "checkpoints
 BEST_POLICY_FILE = WORKSPACE_ROOT / "output" / "evolved_policy_v5.py"
 EVOLUTION_RUNS_DIR = WORKSPACE_ROOT / "output" / "evolution_runs_v5"
 
+_env_file = WORKSPACE_ROOT / ".env"
+if _env_file.exists():
+    with open(_env_file) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip().strip("'\""))
+
 
 def get_latest_checkpoint_iteration() -> int:
     """Returns the highest iteration number found in checkpoints directory."""
