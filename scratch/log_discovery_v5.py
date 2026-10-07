@@ -51,7 +51,7 @@ BASELINES = {
 }
 
 ISLAND_NAMES = {
-    0: "Island 0: Core Realism Conformal Branch",
+    0: "Unified Realism Conformal Frontier",
     1: "Island 1: Continuous Complexity Dynamics Radical",
     2: "Island 2: Adaptive Queue Damping Radical",
 }

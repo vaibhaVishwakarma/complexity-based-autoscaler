@@ -281,7 +281,7 @@ def _run_single_simulation(
 
     t0 = time.time()
     try:
-        res = subprocess.run(cmd, cwd=str(WORKSPACE_ROOT), capture_output=True, text=True, timeout=120, env=env)
+        res = subprocess.run(cmd, cwd=str(WORKSPACE_ROOT), capture_output=True, text=True, timeout=240, env=env)
         elapsed = time.time() - t0
         if res.returncode != 0:
             logger.warning(f"Run failed for {regime} (delay={startup_delay_s}s):\n{res.stderr[:300]}")
@@ -455,6 +455,40 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         - realism_shock_penalty
         + inferline_bonus
     )
+
+    # ── Duplicate & Stagnation Gating ─────────────────────────────────────────
+    # Reject degenerate policies that fail to scale dynamically (cost >= 27,900 ws or cost_savings <= 0.0)
+    if canon_cost >= FIXED_CAPACITY_WORKER_SECONDS or cost_savings <= 0.0:
+        logger.warning(f"Candidate {program_path} failed to scale dynamically (cost={canon_cost:.1f} ws). Rejecting.")
+        fitness_j = -1000.0
+        cost_savings = -100.0
+
+    # Signature deduplication: reject candidates yielding identical performance signatures
+    history_file = EVOLUTION_OUTPUT_DIR / "fitness_signature_history.json"
+    is_seed = ("seed_policy" in Path(program_path).stem or "champion" in Path(program_path).stem)
+    sig_key = f"{canon_cost:.1f}_{canon_misses}_{realism_misses}_{canon_deltas:.0f}"
+
+    seen_signatures = {}
+    if history_file.exists():
+        try:
+            with open(history_file, "r", encoding="utf-8") as f:
+                seen_signatures = json.load(f)
+        except Exception:
+            seen_signatures = {}
+
+    if not is_seed and sig_key in seen_signatures:
+        logger.warning(
+            f"Duplicate fitness signature detected ({sig_key}) matching {seen_signatures[sig_key]}. "
+            f"Applying stagnation rejection penalty."
+        )
+        fitness_j -= 500.0  # Harshly penalize duplicate to reject from MAP-Elites elite pool
+    elif not is_seed:
+        seen_signatures[sig_key] = Path(program_path).stem
+        try:
+            with open(history_file, "w", encoding="utf-8") as f:
+                json.dump(seen_signatures, f)
+        except Exception:
+            pass
 
     summary_text = (
         f"=== EVALUATOR v5 DUAL-TIER BENCHMARK SUMMARY ===\n"

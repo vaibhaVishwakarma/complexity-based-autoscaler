@@ -16,12 +16,17 @@ AGENTS.md Rule #4 — Self-documenting header and inline comments.
 from __future__ import annotations
 
 import importlib.util
+import logging
 import math
 import os
+import sys
 import time
+import traceback
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional
+
+logger = logging.getLogger("extensions_local")
 
 from continuum_bench.controllers.autoscaling_baselines import _PlacementReplanMixin
 from continuum_bench.controllers.interfaces import (
@@ -266,11 +271,14 @@ class EvolvedConformalController(_PlacementReplanMixin):
             if spec is None or spec.loader is None:
                 raise ImportError(f"Could not load spec for {self.policy_path}")
             module = importlib.util.module_from_spec(spec)
+            sys.modules["candidate_policy"] = module
             spec.loader.exec_module(module)
             self._compute_fn = module.compute_target_workers
             self._TelemetricState = module.TelemetricState
         except Exception as e:
             self._load_error = str(e)
+            logger.error(f"Failed to load candidate policy from {self.policy_path}: {e}\n{traceback.format_exc()}")
+            raise RuntimeError(f"Candidate policy failed to load from {self.policy_path}: {e}") from e
 
     def _velocity(self, history: Deque[float]) -> float:
         """Compute finite-difference velocity from a sliding window of values."""
