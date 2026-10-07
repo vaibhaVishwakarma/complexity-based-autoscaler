@@ -38,7 +38,7 @@ early_stopping_metric: "combined_score"
 
 llm:
   models:
-    - name: "gemini-2.5-flash-lite"
+    - name: "gemini-3.5-flash-lite"
       api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
       api_key: "${GEMINI_API_KEY}"
       provider: "openai"
@@ -62,7 +62,7 @@ llm:
       retry_delay: 5
       random_seed: 42
 
-    - name: "gemini-2.5-flash"
+    - name: "gemini-3-flash-preview"
       api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
       api_key: "${GEMINI_API_KEY}"
       provider: "openai"
