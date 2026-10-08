@@ -1,0 +1,132 @@
+# openevolve_config_v6.yaml — Step 8.6: Realism-Aware Evolutionary Synthesis Configuration
+# =========================================================================================
+#
+# Role:
+#   Master configuration for OpenEvolve v6 evolutionary search.
+#   Directives:
+#   1. CANONICAL FLOOR PRESERVATION: Maintain strict zero deadline misses across
+#      the 13 canonical benchmark regimes at T_init = 1.0s, keeping >= 50% cost savings.
+#   2. REALISM GAP BRIDGING: Overcome delayed semantic shocks and acute Poisson bursts
+#      under operational container startup delays (T_init in [2.0s, 5.0s, 15.0s, 50.0s, 150.0s, 300.0s]).
+#   3. Target mathematical discoveries:
+#      - Derivative-conditioned booting credit (discounting booting credit when dQ/dt > 0 or task age > 1.5s).
+#      - Pre-emptive triage expansion when p_fast_velocity < -0.05 or p_fast < 0.40.
+#      - Asymmetric scale-down hysteresis with micro-queue slack.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TOP-LEVEL EVOLUTION SETTINGS
+# ─────────────────────────────────────────────────────────────────────────────
+
+max_iterations: 150
+checkpoint_interval: 1
+log_level: "INFO"
+random_seed: 42
+language: "python"
+file_suffix: ".py"
+
+diff_based_evolution: true
+enforce_evolve_blocks: true
+max_code_length: 25000
+
+early_stopping_patience: 40
+convergence_threshold: 0.01
+early_stopping_metric: "combined_score"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LLM CONFIGURATION (MULTI-MODEL ROUTING WITH TEMPERATURE 0.7)
+# ─────────────────────────────────────────────────────────────────────────────
+
+llm:
+  models:
+    - name: "gemini-flash-lite-latest"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 1.0
+      temperature: 0.7
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PROMPT CONFIGURATION (V6 PHYSICAL CAUSALITY & REALISM DIRECTIVES)
+# ─────────────────────────────────────────────────────────────────────────────
+
+prompt:
+  num_top_programs: 3
+  num_diverse_programs: 2
+  include_artifacts: true
+  max_artifact_bytes: 10240
+  suggest_simplification_after_chars: 4000
+
+  system_message: |
+    You are an elite cloud-edge systems researcher evolving the REALISM-AWARE CONFORMAL AUTOSCALER LAW (v6).
+    Your mission: synthesize an algebraic scaling law that PRESERVES ZERO MISSES and >50% cost savings on canonical workloads while ELIMINATING QUEUE COLLAPSE during operational container startup delays (T_init = 2.0s to 50.0s).
+
+    V6 Fitness Objective:
+      J_v6 = J_v3_core(Tier 1 Canonical) + J_realism(Tier 2 Realism Triad) + BaselineDominanceBonuses
+
+      Where:
+        J_v3_core = CostSavings_canon - (2.0 * min(M_canon, 10) + 20.0 * max(0, M_canon - 10))
+                    - 10.0 * max(0, P99_canon - 6.0) - 0.01 * Deltas_canon
+        J_realism = -1.0 * M_realism - 5.0 * max(0, P99_realism - 15.0)
+        Dominance Bonuses: +10.0 for beating InferLine Canonical (<14,261 ws, 0 misses)
+                           +10.0 for beating InferLine Realism (<35 misses)
+
+      1. CANONICAL PRESERVATION IS MANDATORY (>50% SAVINGS & ZERO MISSES):
+         Any deadline miss on the canonical 13 regimes incurs heavy penalties!
+         CRITICAL: Do NOT hold onto workers or freeze scale-down during steady-state canonical traffic!
+         Canonical Cost must remain strictly below 13,950 worker-seconds (Target: 11,874 ws from Seed v3).
+
+      2. PHYSICAL CAUSALITY & STARTUP DELAY MECHANICS:
+         In real Kubernetes / Triton deployments, workers take 2.0s to 50.0s to spin up (T_init).
+         During this startup lag, newly ordered workers CANNOT service requests.
+         The seed policy currently suffers 11 misses on suite2_shock @ 15.0s delay because requests
+         accumulate before unbooted workers finish initializing.
+         To eliminate these 11 misses without inflating steady-state cost:
+         a) Use `p_fast_velocity` lookahead: A negative velocity (dp_fast/dt < -0.05) signals that edge triage
+            is degrading and cloud requests will surge 1-2 seconds in advance. Scale up pre-emptively!
+         b) Modulate booting credit dynamically:
+            - When queues are accelerating (dQ/dt > 0) or task age is climbing (> 1.2s), discount booting credit
+              (e.g., from 0.95 down to 0.10) to provision emergency capacity immediately.
+            - When queues are stable or draining (dQ/dt <= 0), retain full 95% booting credit to avoid over-provisioning.
+         c) Asymmetric scale-down hysteresis: Hold capacity when task age > 1.0s or queue > 1 to prevent premature scale-down.
+
+      3. CODE STRUCTURE RULES:
+         - Output ONLY valid, compilable Python 3 code within the EVOLVE-BLOCK delimiters.
+         - Do NOT import forbidden modules (os, sys, subprocess, socket, urllib, threading).
+         - Do NOT use While loops (autoscaling laws must be closed-form algebraic expressions).
+         - Never return NaN, None, or float outside [1, 18]. Always return `int(clamp(k, 1, 18))`.
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EVALUATOR CONFIGURATION (CASCADE EVALUATION PIPELINE)
+# ─────────────────────────────────────────────────────────────────────────────
+
+evaluator:
+  cascade_evaluation: true
+  cascade_thresholds:
+    - 0.5
+    - 0.5
+  timeout: 600
+  enable_artifacts: true
+  use_llm_feedback: false
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATABASE & POPULATION SETTINGS (UNIFIED POPULATION WITH MAP-ELITES)
+# ─────────────────────────────────────────────────────────────────────────────
+
+database:
+  population_size: 80
+  num_islands: 1
+  feature_dimensions:
+    - "cost_savings"
+    - "realism_resilience"
+  feature_bins:
+    cost_savings: 10
+    realism_resilience: 10

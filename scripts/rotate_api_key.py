@@ -55,7 +55,7 @@ logger = logging.getLogger("key_rotator")
 WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ENV_FILE = WORKSPACE_ROOT / ".env"
 DEFAULT_BACKUP_FILE = WORKSPACE_ROOT / ".env.backup"
-DEFAULT_MODEL = "gemini-3.5-flash-lite"
+DEFAULT_MODEL = "gemini-flash-lite-latest"
 API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 
@@ -147,7 +147,7 @@ def write_active_key(env_file: Path, new_key: str) -> None:
         f.writelines(lines)
 
 
-def test_api_key(api_key: str, model: str = DEFAULT_MODEL, timeout_s: float = 8.0) -> Tuple[bool, str]:
+def test_api_key(api_key: str, model: str = DEFAULT_MODEL, timeout_s: float = 25.0) -> Tuple[bool, str]:
     """
     Pings Google AI Studio's OpenAI-compatible endpoint with a minimal 1-token query.
     Returns (is_healthy, status_message).
