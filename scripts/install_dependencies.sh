@@ -32,12 +32,26 @@ echo "======================================================================"
 cd "${WORKSPACE_ROOT}"
 
 # ── 1. Virtual Environment Setup ─────────────────────────────────────────────
-if [ ! -d ".venv" ]; then
-    echo "[1/6] Creating Python 3 virtual environment in .venv..."
-    pip install virtualenv
-    virtualenv .venv --python=python3.12
+if [ ! -d ".venv" ] || [ ! -x ".venv/bin/pip" ] || [ ! -x ".venv/bin/python" ]; then
+    echo "[1/6] Initializing/repairing Python 3 virtual environment in .venv..."
+    rm -rf .venv
+
+    SYS_PYTHON="python3"
+    if command -v python3.12 &>/dev/null; then
+        SYS_PYTHON="python3.12"
+    fi
+    echo "  -> Using base interpreter: ${SYS_PYTHON} ($(${SYS_PYTHON} --version 2>&1))"
+
+    if ! "${SYS_PYTHON}" -m venv .venv 2>/dev/null; then
+        echo "  -> Standard venv creation failed; attempting virtualenv..."
+        if ! command -v virtualenv &>/dev/null; then
+            "${SYS_PYTHON}" -m pip install --upgrade virtualenv 2>/dev/null || pip install virtualenv 2>/dev/null || true
+        fi
+        virtualenv .venv --python="${SYS_PYTHON}"
+    fi
+    echo "  -> Virtual environment successfully created."
 else
-    echo "[1/6] Using existing virtual environment in .venv."
+    echo "[1/6] Using existing verified virtual environment in .venv."
 fi
 
 VENV_PYTHON="${WORKSPACE_ROOT}/.venv/bin/python"
