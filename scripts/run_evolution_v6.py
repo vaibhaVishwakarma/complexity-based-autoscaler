@@ -128,7 +128,23 @@ AGENTS.md Compliance:
 """
 
 '''
-        evolved_source = provenance + best.code
+        # Ensure code doesn't have duplicate initial docstrings before from __future__
+        raw_code = best.code
+        if raw_code.strip().startswith('"""'):
+            parts = raw_code.strip().split('"""', 2)
+            if len(parts) >= 3:
+                raw_code = parts[2].lstrip()
+        elif raw_code.strip().startswith("'''"):
+            parts = raw_code.strip().split("'''", 2)
+            if len(parts) >= 3:
+                raw_code = parts[2].lstrip()
+
+        if "from __future__ import annotations" in raw_code:
+            raw_code = raw_code.replace("from __future__ import annotations", "").lstrip()
+            evolved_source = provenance.strip() + "\n\nfrom __future__ import annotations\n\n" + raw_code
+        else:
+            evolved_source = provenance.strip() + "\n\n" + raw_code
+
         output_file.parent.mkdir(parents=True, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(evolved_source)

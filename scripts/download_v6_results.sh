@@ -101,6 +101,10 @@ if [ "${1:-}" = "--pull" ] || [ "${1:-}" = "-p" ]; then
     echo " Dashboard:   ${LOCAL_DEST}/EVOLVED_ALGORITHMS_DISCOVERY_LOG_V6.md"
     echo " Inspected:   ${INSPECT_DIR}/"
     echo "========================================================================"
+    echo ""
+    echo "To run full local evaluation of the raw output data across all Step 8.5 baselines:"
+    echo "  ./.venv/bin/python scripts/evaluate_v6_raw_results.py --candidate output/evolved_policy_v6.py"
+    echo "========================================================================"
     exit 0
 fi
 

@@ -147,7 +147,7 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
     p_path = Path(program_path)
     if not p_path.exists():
         return EvaluationResult(
-            metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+            metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
             artifacts={"error": "File does not exist"},
         )
 
@@ -157,7 +157,7 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
         tree = ast.parse(source, filename=str(p_path))
     except SyntaxError as e:
         return EvaluationResult(
-            metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+            metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
             artifacts={"error": f"SyntaxError: {e}"},
         )
 
@@ -167,18 +167,18 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
             for alias in node.names:
                 if alias.name.split(".")[0] in FORBIDDEN_MODULES:
                     return EvaluationResult(
-                        metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                        metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                         artifacts={"error": f"Forbidden import: {alias.name}"},
                     )
         elif isinstance(node, ast.ImportFrom):
             if node.module and node.module.split(".")[0] in FORBIDDEN_MODULES:
                 return EvaluationResult(
-                    metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                    metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                     artifacts={"error": f"Forbidden from-import: {node.module}"},
                 )
         elif isinstance(node, ast.While):
             return EvaluationResult(
-                metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                 artifacts={"error": "Forbidden While loop detected: autoscaler laws must be closed-form algebraic expressions."},
             )
 
@@ -188,7 +188,7 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
         spec = importlib.util.spec_from_file_location(mod_name, str(p_path))
         if spec is None or spec.loader is None:
             return EvaluationResult(
-                metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                 artifacts={"error": "Cannot load module spec"},
             )
         mod = importlib.util.module_from_spec(spec)
@@ -197,12 +197,12 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
 
         if not hasattr(mod, "compute_target_workers"):
             return EvaluationResult(
-                metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                 artifacts={"error": "Missing compute_target_workers function"},
             )
         if not hasattr(mod, "TelemetricState"):
             return EvaluationResult(
-                metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                 artifacts={"error": "Missing TelemetricState contract dataclass"},
             )
 
@@ -251,18 +251,18 @@ def evaluate_stage1(program_path: str) -> EvaluationResult:
             k = mod.compute_target_workers(s)
             if not isinstance(k, (int, float)) or math.isnan(k) or k < 1 or k > 18:
                 return EvaluationResult(
-                    metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+                    metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
                     artifacts={"error": f"Invalid output k={k} (must be int in [1, 18])"},
                 )
 
     except Exception as e:
         return EvaluationResult(
-            metrics={"stage1_passed": 0.0, "combined_score": -1000.0},
+            metrics={"stage1_passed": 0.0, "combined_score": -1000.0, "cost_savings": 0.0, "realism_resilience": 0.0},
             artifacts={"error": f"Execution exception: {e}\n{traceback.format_exc()}"},
         )
 
     return EvaluationResult(
-        metrics={"stage1_passed": 1.0, "combined_score": 1.0},
+        metrics={"stage1_passed": 1.0, "combined_score": 1.0, "cost_savings": 0.0, "realism_resilience": 0.0},
         artifacts={"status": "Stage 1 Purity & Boundary Gate Passed"},
     )
 
@@ -385,7 +385,12 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
 
     if len(results) < len(STAGE2_MICRO_TRANCHE):
         return _log_performance_check("stage2", program_path, EvaluationResult(
-            metrics={"stage2_passed": 0.0, "combined_score": -500.0},
+            metrics={
+                "stage2_passed": 0.0,
+                "combined_score": -500.0,
+                "cost_savings": 0.0,
+                "realism_resilience": 0.0,
+            },
             artifacts={"error": f"Failed Stage 2 simulations ({len(results)}/{len(STAGE2_MICRO_TRANCHE)})"},
         ))
 
@@ -414,6 +419,7 @@ def evaluate_stage2(program_path: str) -> EvaluationResult:
             "cost_savings": float(stage2_cost_savings),
             "stage2_misses": float(total_misses),
             "stage2_cost": float(total_cost),
+            "realism_resilience": 0.0,
         },
         artifacts={"stage2_summary": summary},
     ))
@@ -443,13 +449,13 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
                 res = future.result()
                 if res is None:
                     return _log_performance_check("stage3", program_path, EvaluationResult(
-                        metrics={"combined_score": -1000.0, "cost_savings": -100.0},
+                        metrics={"combined_score": -1000.0, "cost_savings": -100.0, "realism_resilience": 0.0},
                         artifacts={"error": f"Simulation failed on {task[0]} (delay={task[1]}s)"},
                     ))
                 results_map[task] = res
             except Exception as exc:
                 return _log_performance_check("stage3", program_path, EvaluationResult(
-                    metrics={"combined_score": -1000.0, "cost_savings": -100.0},
+                    metrics={"combined_score": -1000.0, "cost_savings": -100.0, "realism_resilience": 0.0},
                     artifacts={"error": f"Simulation exception on {task[0]}: {exc}"},
                 ))
 
@@ -507,7 +513,7 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         fitness_j = -1000.0
         cost_savings = -100.0
 
-    # ── Signature Deduplication (Anti-Stagnation Gating) ─────────────────────
+    # ── Signature Deduplication (Progressive 3-Strike Anti-Stagnation Gating) ──
     history_file = EVOLUTION_OUTPUT_DIR / "fitness_signature_history.json"
     is_seed = ("seed_policy" in Path(program_path).stem or "champion" in Path(program_path).stem)
     sig_key = f"{canon_cost:.1f}_{canon_misses}_{realism_misses}_{canon_deltas:.0f}"
@@ -520,14 +526,61 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
         except Exception:
             seen_signatures = {}
 
+    strike_artifacts: Dict[str, Any] = {}
     if not is_seed and sig_key in seen_signatures:
-        logger.warning(f"Duplicate fitness signature ({sig_key}) matching {seen_signatures[sig_key]}. Penalizing.")
-        fitness_j -= 500.0
+        entry = seen_signatures[sig_key]
+        if isinstance(entry, dict):
+            count = int(entry.get("count", 1)) + 1
+            first_seen = str(entry.get("program", "unknown"))
+        else:
+            count = 2
+            first_seen = str(entry)
+
+        seen_signatures[sig_key] = {
+            "count": count,
+            "program": first_seen,
+            "last": Path(program_path).stem,
+            "last_seen_time": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+        if count == 2:
+            # Strike 1: First duplicate occurrence - Soft diversity penalty
+            logger.info(f"Duplicate signature strike 1 ({sig_key}) matching {first_seen}. Soft diversity penalty (-1.0).")
+            fitness_j -= 1.0
+            strike_artifacts["diagnostic_feedback"] = (
+                f"DIVERSITY NOTICE (Strike 1): Output signature matched existing policy {first_seen}. "
+                "Minor diversity penalty (-1.0) applied. Policy remains viable in archive as a parent."
+            )
+        elif count == 3:
+            # Strike 2: Second duplicate occurrence - Stagnation warning & moderate penalty
+            logger.warning(f"Duplicate signature strike 2 ({sig_key}) matching {first_seen}. Moderate penalty (-25.0).")
+            fitness_j -= 25.0
+            strike_artifacts["diagnostic_feedback"] = (
+                "CRITICAL FEEDBACK (Strike 2): Continuous decimal parameter modifications were absorbed by "
+                "integer capacity clamping k = int(clamp(...)), producing identical integer cluster actuation. "
+                "Stop micro-tuning decimal constants. You MUST introduce structural, non-linear logic (e.g. conditional "
+                "booting credits conditioned on dQ/dt or oldest_task_age_s, or early fast-path velocity triggers) to achieve progress."
+            )
+        else:
+            # Strike 3+: Repeated duplicate - Local branch pruning
+            logger.warning(f"Duplicate signature strike {count} ({sig_key}) matching {first_seen}. Branch pruning (-500.0).")
+            fitness_j = -500.0
+            strike_artifacts["diagnostic_feedback"] = (
+                f"STAGNATION PRUNING (Strike {count}): Branch exhausted with identical integer output signature {count} times. "
+                "Candidate pruned from parent selection so evolution focuses on novel structural branches."
+            )
     elif not is_seed:
-        seen_signatures[sig_key] = Path(program_path).stem
+        seen_signatures[sig_key] = {
+            "count": 1,
+            "program": Path(program_path).stem,
+            "last": Path(program_path).stem,
+            "last_seen_time": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+
+    if not is_seed:
         try:
             with open(history_file, "w", encoding="utf-8") as f:
-                json.dump(seen_signatures, f)
+                json.dump(seen_signatures, f, indent=2)
         except Exception:
             pass
 
@@ -570,9 +623,10 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
     except Exception:
         pass
 
+    all_artifacts = {"summary": summary_text, **strike_artifacts}
     return _log_performance_check("stage3", program_path, EvaluationResult(
         metrics=metrics,
-        artifacts={"summary": summary_text},
+        artifacts=all_artifacts,
     ))
 
 

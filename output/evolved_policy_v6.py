@@ -21,31 +21,6 @@ AGENTS.md Compliance:
     Rule #2 — Zero hardcoding; causally observable TelemetricState contract.
 """
 
-"""
-seed_policy_v6.py — Step 8.6: Realism-Aware Evolution v6 Seed Policy
-=====================================================================
-
-Role:
-    Initial seed policy for OpenEvolve v6 evolutionary synthesis.
-    Directly inherits the clean mathematical formulation of Champion Policy v3 (bbd9b1c2),
-    guaranteeing Generation 0 starts with:
-      - 57.44% cost savings vs Fixed Capacity (11,874.0 ws)
-      - Zero deadline misses across all 13 canonical regimes (100% SLA compliance)
-      - Superiority over InferLine (14,261 ws, 44 misses)
-      - Contained realism misses (11 misses on shock @ 15s, 0 on all other 9 regimes)
-    OpenEvolve v6 mutates this law to bridge the physical scale gap under real-world
-    container initialization delays without compromising canonical frugality.
-
-Lineage:
-    Discovered in: OpenEvolve v3 (Iteration 115, Island 0, bbd9b1c2)
-    Fitness J_v3:  +55.1609
-
-AGENTS.md Compliance:
-    Rule #1 — Dedicated v6 seed file.
-    Rule #2 — Zero hardcoding; strictly adheres to frozen TelemetricState contract.
-    Rule #4 — Self-documenting structure.
-"""
-
 from __future__ import annotations
 
 import math

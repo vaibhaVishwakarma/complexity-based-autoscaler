@@ -275,8 +275,24 @@ Mutation Rationale:
 """
 
 '''
+        raw_code = p.get("code", "")
+        if raw_code.strip().startswith('"""'):
+            parts = raw_code.strip().split('"""', 2)
+            if len(parts) >= 3:
+                raw_code = parts[2].lstrip()
+        elif raw_code.strip().startswith("'''"):
+            parts = raw_code.strip().split("'''", 2)
+            if len(parts) >= 3:
+                raw_code = parts[2].lstrip()
+
+        if "from __future__ import annotations" in raw_code:
+            raw_code = raw_code.replace("from __future__ import annotations", "").lstrip()
+            variant_source = provenance_header.strip() + "\n\nfrom __future__ import annotations\n\n" + raw_code
+        else:
+            variant_source = provenance_header.strip() + "\n\n" + raw_code
+
         with open(file_path, "w", encoding="utf-8") as f:
-            f.write(provenance_header + p.get("code", ""))
+            f.write(variant_source)
 
         leaderboard_rows.append({
             "rank": rank,

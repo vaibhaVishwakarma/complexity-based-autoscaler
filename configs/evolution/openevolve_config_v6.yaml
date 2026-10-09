@@ -34,17 +34,30 @@ early_stopping_metric: "combined_score"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LLM CONFIGURATION (MULTI-MODEL ROUTING WITH TEMPERATURE 0.7)
+# LLM CONFIGURATION (DUAL-STREAM EXPLORATION/EXPLOITATION ENSEMBLE)
 # ─────────────────────────────────────────────────────────────────────────────
 
 llm:
   models:
+    # Stream A: Creative Explorer (65% weight, high temperature for structural jumps)
     - name: "gemini-flash-lite-latest"
       api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
       api_key: "${GEMINI_API_KEY}"
       provider: "openai"
-      weight: 1.0
-      temperature: 0.7
+      weight: 0.65
+      temperature: 0.85
+      max_tokens: 16384
+      timeout: 120
+      retries: 3
+      retry_delay: 5
+      random_seed: 42
+    # Stream B: Precision Calibrator (35% weight, low temperature for constant tuning)
+    - name: "gemini-flash-lite-latest"
+      api_base: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      api_key: "${GEMINI_API_KEY}"
+      provider: "openai"
+      weight: 0.35
+      temperature: 0.40
       max_tokens: 16384
       timeout: 120
       retries: 3
@@ -92,15 +105,21 @@ prompt:
             is degrading and cloud requests will surge 1-2 seconds in advance. Scale up pre-emptively!
          b) Modulate booting credit dynamically:
             - When queues are accelerating (dQ/dt > 0) or task age is climbing (> 1.2s), discount booting credit
-              (e.g., from 0.95 down to 0.10) to provision emergency capacity immediately.
+              (e.g. booting * max(0.0, 0.95 - beta * queue_velocity)) to provision emergency capacity immediately.
             - When queues are stable or draining (dQ/dt <= 0), retain full 95% booting credit to avoid over-provisioning.
          c) Asymmetric scale-down hysteresis: Hold capacity when task age > 1.0s or queue > 1 to prevent premature scale-down.
 
-      3. CODE STRUCTURE RULES:
+      3. CRITICAL: AVOID THE INTEGER DISCRETIZATION TRAP:
+         The cluster allocates whole worker integers: k = int(clamp(target, 1, 18)).
+         DO NOT make micro-adjustments to continuous decimal constants (e.g. 2.08 -> 2.05).
+         Tiny decimal tweaks are rounded away and produce IDENTICAL actuation profiles, which are penalized for stagnation.
+         You MUST introduce structural, non-linear logic (new interaction terms, dynamic gating, conditional terms) to advance.
+
+      4. CODE STRUCTURE RULES:
          - Output ONLY valid, compilable Python 3 code within the EVOLVE-BLOCK delimiters.
          - Do NOT import forbidden modules (os, sys, subprocess, socket, urllib, threading).
          - Do NOT use While loops (autoscaling laws must be closed-form algebraic expressions).
-         - Never return NaN, None, or float outside [1, 18]. Always return `int(clamp(k, 1, 18))`.
+         - Never return NaN, None, or float outside [1, 18]. Always return `int(max(1, min(18, target)))`.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
