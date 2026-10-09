@@ -100,7 +100,7 @@ def export_best_policy(evolve_instance: OpenEvolve, output_file: Path):
 
         canon_miss = best.metrics.get("canonical_misses", best.metrics.get("deadline_misses", 0))
         realism_miss = best.metrics.get("realism_misses", "N/A")
-        wsec = best.metrics.get("worker_seconds", "N/A")
+        wsec = best.metrics.get("canonical_cost_ws", best.metrics.get("worker_seconds", "N/A"))
         deltas = best.metrics.get("scaling_deltas", "N/A")
         p99 = best.metrics.get("max_p99_latency_s", "N/A")
 
@@ -253,8 +253,11 @@ def update_discovery_dashboard(
             best_id = f"`{best.id[:8]}`"
             best_fit = f"{best.metrics.get('combined_score', 0.0):.4f}"
             best_savings = f"{best.metrics.get('cost_savings', 0.0):.2f}%"
-            best_cost_val = best.metrics.get("worker_seconds", 0.0)
-            best_cost = f"{best_cost_val:.1f} ws" if isinstance(best_cost_val, (int, float)) else str(best_cost_val)
+            best_cost_val = best.metrics.get("canonical_cost_ws", best.metrics.get("worker_seconds", None))
+            if best_cost_val is None or best_cost_val == 0.0:
+                sav = best.metrics.get("cost_savings", 0.0)
+                best_cost_val = (1.0 - sav / 100.0) * 27900.0 if sav > 0 else 0.0
+            best_cost = f"{best_cost_val:,.1f} ws" if isinstance(best_cost_val, (int, float)) else str(best_cost_val)
             best_c_miss = int(best.metrics.get("canonical_misses", best.metrics.get("deadline_misses", 0)))
             best_r_miss_val = best.metrics.get("realism_misses", "N/A")
             best_r_miss = f"{best_r_miss_val:.0f}" if isinstance(best_r_miss_val, (int, float)) else str(best_r_miss_val)

@@ -628,6 +628,7 @@ def evaluate_stage3(program_path: str) -> EvaluationResult:
             "combined_score": float(fitness_j),
             "cost_savings": float(cost_savings),
             "canonical_cost_ws": float(canon_cost),
+            "worker_seconds": float(canon_cost),
             "canonical_misses": float(canon_misses),
             "realism_misses": float(realism_misses),
             "realism_resilience": float(realism_resilience),
