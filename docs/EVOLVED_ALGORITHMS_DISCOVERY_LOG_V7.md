@@ -1,8 +1,8 @@
 # Evolved Algorithms Discovery Dashboard v7
 **Real-Time Evolutionary Progress — OpenEvolve v7 Realism-Aware Policy Synthesis**
 
-- **Last Updated**: 2026-10-09 09:15:09Z
-- **Active Population Size**: 4
+- **Last Updated**: 2026-10-09 09:22:17Z
+- **Active Population Size**: 2
 - **Search Configuration**: `openevolve_config_v7.yaml`
 - **Search Objective**: Maximize $J_{\text{v7}} = J_{\text{v3\_core}}(\text{Tier 1}) + J_{\text{realism}}(\text{Tier 2}) + \text{DominanceBonuses}$
 
@@ -13,13 +13,13 @@
 | Metric | Value | Operational Context |
 |:---|:---:|:---|
 | **Active LLM Backbone** | `gemini-flash-lite-latest` | Direct OpenAI-compatible Gemini endpoint |
-| **Total Mutations Evaluated** | **27** | Candidate diff ASTs compiled & tested through cascade |
-| **Successful Mutations** | 27 | Passed syntax & boundary tests to benchmark |
+| **Total Mutations Evaluated** | **1** | Candidate diff ASTs compiled & tested through cascade |
+| **Successful Mutations** | 1 | Passed syntax & boundary tests to benchmark |
 | **Failed / Rejected Mutations** | 0 | AST violations, while-guards, or syntax errors |
-| **Total Tokens Consumed** | **366,580** | Cumulative prompt + completion tokens |
-| **Prompt Tokens** | 349,554 | Grounded system instructions & context prompts |
-| **Completion Tokens** | 17,026 | Synthesized code diffs & search/replace blocks |
-| **Mean Churn per Mutation** | **13,577.0** tokens/call | Average token intensity per evolutionary generation |
+| **Total Tokens Consumed** | **6,861** | Cumulative prompt + completion tokens |
+| **Prompt Tokens** | 6,132 | Grounded system instructions & context prompts |
+| **Completion Tokens** | 729 | Synthesized code diffs & search/replace blocks |
+| **Mean Churn per Mutation** | **6,861.0** tokens/call | Average token intensity per evolutionary generation |
 
 ---
 
@@ -29,7 +29,7 @@ Comprehensive benchmark comparison evaluating the Rank 1 Discovered policy again
 
 | Controller / Candidate | Architecture / Origin | Fitness $J_{\text{v7}}$ | Canonical Savings | Canonical Cost | Canonical Misses | Realism Misses | Max P99 Latency | Scaling Deltas | Generalization Assessment |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **Discovered Champion (`d28c6da9`)** | **Evolved (Rank 1)** | **+64.1709** | **57.44%** | **11,874.0 ws** | **0 / 121k** | **11 / 10 runs** | **6.00s** | **227** | **Dominant Generalizer (Zero Canon Misses)** |
+| **Discovered Champion (`87f981f5`)** | **Evolved (Rank 1)** | **63.1013** | **57.35%** | **11,899.0 ws** | **0 / 121k** | **11 / 10 runs** | **14.00s** | **225** | **Dominant Generalizer (Zero Canon Misses)** |
 | **Seed v7 Policy (`bbd9b1c2`)** | Seed (v3 Global Champ) | +64.1709 | 57.44% | 11,874.0 ws | 0 / 121k | 11 / 10 runs | 6.00s (canon) / 14.0s (real) | 227 | Fully SLA Compliant Anchor |
 | **InferLine Reference** | Profiled Heuristic | +21.3500 | 48.88% | 14,261.0 ws | 44 / 121k | $\approx 31$ / 10 runs | 14.00s | 855 | Decoupled Semantic Drift Blindness |
 | **Kubernetes HPA** | Reactive RPS/CPU | -7,150.00 | 31.18% | 19,200.0 ws | 0 / 121k | > 7,200 / 10 runs | 72.00s | 1,240 | Catastrophic Queue Collapse under Boot Delay |
@@ -44,10 +44,8 @@ Comprehensive benchmark comparison evaluating the Rank 1 Discovered policy again
 
 | Rank | Program ID | Fitness $J_{\text{v7}}$ | Canonical Savings | Canonical Misses | Realism Misses | Max P99 | Deltas |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1 | `d28c6da9` | **64.1709** | 57.44% | 0 | 11 | 6.00s | 227 |
-| 2 | `5aff502e` | **64.1013** | 57.35% | 0 | 11 | 6.00s | 225 |
-| 3 | `d289bc15` | **-435.8987** | 57.35% | 0 | 11 | 6.00s | 225 |
-| 4 | `ae7be262` | **-435.8987** | 57.35% | 0 | 11 | 6.00s | 225 |
+| 1 | `87f981f5` | **63.1013** | 57.35% | 0 | 11 | 14.00s | 225 |
+| 2 | `4b8d2bc7` | **48.5392** | 51.99% | 0 | 11 | 14.00s | 245 |
 
 ---
 
