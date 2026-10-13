@@ -1,50 +1,38 @@
-# Validity Gate 1 — Fast-Path Safety & Online Calibration
-## Scrutiny-Hardened Implementation, Genuine Empirical Results & Code Audit
+# Conformal Calibration — Fast-Path Safety & Online Calibration
+## Scrutiny-Hardened Implementation, Empirical Results & Code Structure
 
-> **Module:** `gate1/`  
-> **Forensic Scrutiny Report:** [`gate1-scrutiny.md`](file:///home/vaibo/conformal-inference/gate1/gate1-scrutiny.md)  
-> **Gate Status:** **PASS ✅ (calibration + FP safety) — ACI limitation honestly documented**
+> **Module:** `calibration/` (with backward-compatible symlink `gate1/`)  
+> **Archived Audit:** [`.archive/legacy_scrutiny/gate1-scrutiny.md`](file:///.archive/legacy_scrutiny/gate1-scrutiny.md)  
+> **Status:** **PASS ✅ (calibration + FP safety) — ACI non-stationary dynamics documented**
 
 ---
 
 ## 1. Executive Summary
 
-Gate 1 establishes that our lightweight fast-path model (`EfficientNet-B0`, distilled from `ResNet-152`) can be calibrated with conformal prediction to provide **provable marginal coverage guarantees** and **safe singleton routing** under baseline and moderate distribution shift.
+`calibration/` establishes that our lightweight fast-path model (`EfficientNet-B0`, distilled from `ResNet-152`) can be calibrated with conformal prediction to provide **provable marginal coverage guarantees** and **safe singleton routing** under baseline and moderate distribution shift.
 
-The forensic audit ([`gate1-scrutiny.md`](file:///home/vaibo/conformal-inference/gate1/gate1-scrutiny.md)) identified **5 scientific violations** in the original implementation. All 5 have been resolved and re-run on genuine production-grade splits. In addition, the storage contracts have been cleanly separated:
-- **Configs:** [`gate1/configs/`](file:///home/vaibo/conformal-inference/gate1/configs/)
-- **Models:** [`models/`](file:///home/vaibo/conformal-inference/models/)
-- **Outputs:** [`gate1/output/`](file:///home/vaibo/conformal-inference/gate1/output/)
-- **Datasets:** Centralized in [`core/download_datasets.py`](file:///home/vaibo/conformal-inference/core/download_datasets.py)
+All scientific scrutiny points identified during audit have been resolved and verified on genuine splits. In addition, the storage contracts are cleanly separated:
+- **Configs:** [`calibration/configs/`](file:///home/vaibo/auto-edgecompute/calibration/configs/)
+- **Models:** [`models/`](file:///home/vaibo/auto-edgecompute/models/)
+- **Outputs:** [`calibration/output/`](file:///home/vaibo/auto-edgecompute/calibration/output/) (git-ignored)
+- **Contracts:** [`contracts/calibration.py`](file:///home/vaibo/auto-edgecompute/contracts/calibration.py)
 
 ---
 
-## 2. Directory Structure & Storage Contracts
+## 2. Directory Structure & Contracts
 
 ```
-conformal-inference/
-├── core/
-│   ├── download_datasets.py         # Unified dataset downloader (SSOT)
-│   ├── cross_gate_registry.py       # Reads gate1/configs/calibration_config.json
-│   └── trace_dataset.py             # Azure LMM 2025 trace loader
-├── gate1/
-│   ├── configs/                     # Fixed configuration & mapping tables
-│   │   ├── calibration_config.json  # Authoritative calibration metrics (q_hat, FP, err)
-│   │   ├── tiny_class_mapping.json  # 182-class mapped WNID table
-│   │   └── imagenet_class_index.json# 1,000-class standard index
-│   ├── output/                      # Evaluation run outputs ONLY
-│   │   ├── aci_online_report.json   # 500-step streaming ACI benchmark
-│   │   └── selective_error_report.json # 25-scenario Tiny ImageNet-C benchmark
-│   ├── calibrate_export_onnx.py     # Calibration & ONNX exporter
-│   ├── download_datasets.py         # Thin wrapper delegating to core
-│   ├── evaluate_aci_online.py       # Streaming online recalibration benchmark
-│   ├── evaluate_imagenet_c.py       # Corruption benchmark with integrated ACI
-│   ├── recalibrate_onnx.py          # Quick ONNX Runtime verification
-│   ├── train_distill.py             # Knowledge distillation student training
-│   └── train_distill_new.py         # Multi-GPU distillation training
-└── models/                          # Repository root model storage
-    ├── efficientnet_b0_tiny.onnx    # 712 KB fast-path ONNX graph
-    └── efficientnet_b0_tiny.onnx.data # 16.9 MB model tensor weights
+calibration/
+├── configs/                     # Canonical calibration configuration & class mappings
+│   ├── calibration_config.json  # Authoritative calibration metrics (q_hat, FP, err)
+│   ├── tiny_class_mapping.json  # 182-class mapped WNID table
+│   └── imagenet_class_index.json# 1,000-class standard index
+├── calibrate_export_onnx.py     # Split-conformal quantile calibration & ONNX exporter
+├── download_datasets.py         # Authoritative dataset and trace verification
+├── evaluate_aci_online.py       # Streaming online recalibration benchmark
+├── evaluate_imagenet_c.py       # Corruption benchmark with integrated ACI
+├── recalibrate_onnx.py          # Fast ONNX Runtime coverage verification
+└── train_distill.py             # Knowledge distillation student training
 ```
 
 ---
@@ -230,40 +218,43 @@ Generated artifact: [`gate1/output/aci_online_report.json`](file:///home/vaibo/c
 
 ## 7. Execution Commands
 
-All commands should be run from the repository root:
+All commands must be run strictly from the repository root using the dedicated virtual environment:
 
 ```bash
-# 1. Prepare Datasets & Class Mapping (SSOT via core)
-python3 -m core.download_datasets --tiny-imagenet
+# 1. Verify Datasets & Trace Availability
+./.venv/bin/python -m calibration.download_datasets
 
 # 2. Verify ONNX Runtime & True RAPS Calibration
-python3 -m gate1.recalibrate_onnx
+./.venv/bin/python -m calibration.recalibrate_onnx
 
 # 3. Run Tiny ImageNet-C Corruption Benchmark with Integrated ACI
-python3 -m gate1.evaluate_imagenet_c
+./.venv/bin/python -m calibration.evaluate_imagenet_c
 
 # 4. Run Streaming ACI Online Recalibration Simulation
-python3 -m gate1.evaluate_aci_online
+./.venv/bin/python -m calibration.evaluate_aci_online
 
 # 5. Optional: Calibrate & Export ONNX from Checkpoint
-python3 -m gate1.calibrate_export_onnx \
+./.venv/bin/python -m calibration.calibrate_export_onnx \
     --temp 1.0 --lambda-reg 0.01 --k-reg 5 \
     --alpha 0.10 --cal-size 5000 \
-    --config-dir gate1/configs \
+    --config-dir calibration/configs \
     --model-dir models \
-    --out-dir gate1/output
+    --out-dir calibration/output
 ```
 
 ---
 
-## 8. Cross-Gate Architectural Integration
+## 8. Cross-Stage Typed Contract Integration
 
-Gate 1 outputs are automatically ingested into the single source of truth [`core/cross_gate_registry.py`](file:///home/vaibo/conformal-inference/core/cross_gate_registry.py).
+Calibration parameters are loaded dynamically downstream via verified typed Pydantic contracts ([`contracts/calibration.py`](file:///home/vaibo/auto-edgecompute/contracts/calibration.py)):
 
-Whenever `core.load_registry()` is called by downstream gates (Gate 3, Gate 4, Gate 5, Gate 6):
-1. It reads [`gate1/configs/calibration_config.json`](file:///home/vaibo/conformal-inference/gate1/configs/calibration_config.json).
-2. It asserts physical invariants:
-   - $0.35 \le \text{FP}_{\text{frac}} \le 0.70$
-   - $1.0 \le |\mathcal{C}(x)| \le 15.0$
-   - $0.50 \le \hat{q} \le 1.00$
-3. Downstream Gym environments ([`gate4/gym_env.py`](file:///home/vaibo/conformal-inference/gate4/gym_env.py)) receive the verified fast-path routing fraction without hardcoding.
+```python
+from contracts.calibration import load_gate1_config
+
+# Load verified calibration manifest
+cfg = load_gate1_config()
+q_hat = cfg.q_hat                          # 0.79914002
+fast_path_fraction = cfg.fast_path_fraction  # 0.50
+```
+
+Downstream autoscalers and profiling scripts ingest `fast_path_fraction` directly from this contract, maintaining strict decoupled linkage without hardcoded parameters.

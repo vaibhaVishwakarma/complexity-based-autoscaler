@@ -1,9 +1,9 @@
-# Validity Gate 2 — Service Profiling & Workload-Complexity Correlation
-## Scrutiny-Hardened Implementation, Genuine Empirical Results & Integrity Audit
+# Hardware Profiling — Service Profiling & Workload-Complexity Correlation
+## Empirical Latency Surface, Queuing-Aware Spearman & Physical Grounding
 
-> **Module:** `gate2/`  
-> **Forensic Scrutiny Report:** [`gate2/gate2-scrutiny.md`](file:///home/vaibo/conformal-inference/gate2/gate2-scrutiny.md)  
-> **Gate Status:** **PASS ✅ — all 6 scrutiny fixes verified, both hardware pathways**
+> **Module:** `profiling/` (with backward-compatible symlink `gate2/`)  
+> **Archived Audit:** [`.archive/legacy_scrutiny/gate2-scrutiny.md`](file:///.archive/legacy_scrutiny/gate2-scrutiny.md)  
+> **Status:** **PASS ✅ — M/M/1 queuing-aware Spearman verified, both hardware pathways**
 
 ---
 
@@ -160,35 +160,44 @@ The $\rho=0.95$ result is key for peer-review credibility: at heavy load, 18% of
 
 ## 6. Execution Commands
 
+All commands must be executed strictly from the repository root using the dedicated virtual environment:
+
 ```bash
-# From repo root: /home/vaibo/conformal-inference
+# 1. Recompute queuing-aware Spearman correlation & render Figure 2 (Offline analysis)
+./.venv/bin/python -m profiling.profile_triton_service --recompute
 
-# Step 1: Profile on target hardware (run on Colab/T4 or c7i respectively)
-python3 -u -m gate2.profile_triton_service \
-    --device cuda   \      # or --device cpu
-    --output gate2/output/triton_service_profiles.json
+# 2. Render Figure 2 latency surfaces for both T4 GPU and c7i CPU
+./.venv/bin/python -m profiling.generate_figures
 
-# Step 2: Recompute queuing-aware Spearman on saved profiles (runs anywhere)
-python3 -u -m gate2.recompute_spearman
+# 3. Optional: Live GPU profiling on hardware (requires live Triton / PyTorch environment)
+./.venv/bin/python -m profiling.profile_triton_service --profile-live --device cuda
 ```
 
 ---
 
 ## 7. Limitations Honestly Disclosed
 
-1. **Synthetic tensors:** Profiling uses $\mathcal{N}(0,1)$ inputs. End-to-end pipeline overhead (preprocessing ~3.75ms, H2D PCIe ~2.5ms) is not included in reported latencies.
+1. **Synthetic tensors:** Profiling uses $\mathcal{N}(0,1)$ inputs. End-to-end pipeline overhead (preprocessing ~3.75ms, H2D PCIe ~2.5ms) is modeled separately in `dynamic_batching_model.py` and `network_batch_link.py`.
 2. **Constant-FLOP model:** ResNet-152 has a static computational graph — q2/q3/q4 bins share the same execution latency. The set-size signal lives entirely in the routing decision, not within-path variation.
 3. **M/M/1 approximation:** The queuing model assumes Poisson arrivals and exponential service times. Real serverless workloads exhibit burstier Pareto-heavy inter-arrivals; the M/M/1 model provides a conservative lower bound on $r_s$ degradation.
-4. **Single-GPU profiling:** GPU jitter is modelled with a 5% CV Gaussian approximation; actual spatio-temporal interference from co-located model serving (USENIX ATC 2022) may introduce higher-variance tail latencies.
+4. **Single-GPU profiling:** GPU jitter is modelled with a 5% CV Gaussian approximation; actual spatio-temporal interference from co-located model serving may introduce higher-variance tail latencies.
 
 ---
 
-## 8. Architectural Integration: The Universal Data Model
-To eliminate hardcoded integration debt, Gate 2 scripts (`profile_triton_service.py`, `recompute_spearman.py`, and `generate_figures.py`) now dynamically pull all universal test parameters from the `core.cross_gate_registry`.
+## 8. Cross-Stage Typed Contract Integration
 
-Key parameters controlled by the registry include:
-*   `BATCH_SIZES = [1, 2, 4, 8, 16, 32]`
-*   `WINDOW_SIZE = 30` (Blocks for Spearman correlation)
-*   `RANDOM_SEED = 42`
+Profiling manifests and queuing Spearman metrics are exposed to the autoscaling simulation engine via typed Pydantic contracts in [`contracts/profiling.py`](file:///home/vaibo/auto-edgecompute/contracts/profiling.py):
 
-To ensure proper resolution of the registry, **all Gate 2 scripts must be run as modules from the project root** (e.g., `python3 -m gate2.recompute_spearman`). All generated JSON profiles and figures are automatically routed back to their respective `gate2/output-gpu-t4/` and `gate2/output-cpu-c7i/` directories.
+```python
+from contracts.profiling import load_gate2_profiles, load_gate2_spearman
+
+# Load empirical Triton service capacity profiles
+profiles = load_gate2_profiles()
+mu_rps = profiles.compute_service_capacity_rps(batch_size=8, batch_timeout_s=0.040)
+
+# Load queuing-aware Spearman statistics
+report = load_gate2_spearman()
+rho_70 = report.get_result(rho=0.7)  # r_s = 0.8210, p < 1e-12
+```
+
+Downstream controllers ([`InferLinePlanner`](file:///home/vaibo/auto-edgecompute/src/continuum_ext/controllers/inferline_planner.py), [`DynamicBatchingModel`](file:///home/vaibo/auto-edgecompute/src/continuum_ext/realism/dynamic_batching_model.py)) ingest hardware capacity directly through these verified schemas without hardcoding.
