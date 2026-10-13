@@ -41,6 +41,7 @@ output/*
 output/evolution_runs/*
 !output/evolution_runs/*.csv
 gate*/output/
+calibration/output/
 runs/
 logs/
 *.log
