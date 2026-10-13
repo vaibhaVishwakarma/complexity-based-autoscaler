@@ -155,7 +155,7 @@ def _load_gate2_surface() -> Dict[int, Tuple[float, float]]:
     Never hardcodes values — always loads from contracts.gate2.
     """
     try:
-        from contracts.gate2 import load_gate2_profiles  # type: ignore[import]
+        from contracts.profiling import load_gate2_profiles  # type: ignore[import]
         profiles = load_gate2_profiles()
         surface: Dict[int, Tuple[float, float]] = {}
         for entry in profiles.gpu_profiles_raw:
@@ -176,7 +176,7 @@ def _load_gate1_s_m() -> float:
     the fraction of requests that reach the cloud tier under calibration conditions.
     """
     try:
-        from contracts.gate1 import load_gate1_config  # type: ignore[import]
+        from contracts.calibration import load_gate1_config  # type: ignore[import]
         cfg = load_gate1_config()
         s_m = 1.0 - float(cfg.fast_path_fraction)
         return max(0.01, min(1.0, s_m))

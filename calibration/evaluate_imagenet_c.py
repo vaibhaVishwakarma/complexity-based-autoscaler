@@ -46,8 +46,8 @@ import scipy.ndimage as ndimage
 from pathlib import Path
 from typing import Optional, List
 
-# Ingest Gate 1 Pydantic contracts (Rule 2: Decoupled Linkage)
-from contracts.gate1 import load_gate1_config, Gate1SelectiveRiskEntry
+# Ingest Calibration Pydantic contracts (Rule 2: Decoupled Linkage)
+from contracts.calibration import load_gate1_config, Gate1SelectiveRiskEntry
 
 try:
     from imagecorruptions import corrupt, get_corruption_names

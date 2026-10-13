@@ -71,7 +71,7 @@ class TritonDynamicBatchingModel:
 
         if target_path.is_file():
             try:
-                from contracts.gate2 import load_gate2_profiles
+                from contracts.profiling import load_gate2_profiles
                 profile = load_gate2_profiles(target_path)
                 # Compute linear fit between b=1 and b=16
                 p1 = profile.get_batch_profile(1)

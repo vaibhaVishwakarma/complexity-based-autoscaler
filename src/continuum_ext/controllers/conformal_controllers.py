@@ -87,7 +87,7 @@ def _load_gate2_capacity(batch_size: int = 8, batch_timeout_s: float = 0.040) ->
     """
     try:
         # Lazy import to avoid hard dep at module import time
-        from contracts.gate2 import load_gate2_profiles  # type: ignore[import]
+        from contracts.profiling import load_gate2_profiles  # type: ignore[import]
 
         profiles = load_gate2_profiles()
         return profiles.compute_service_capacity_rps(
@@ -111,7 +111,7 @@ def _load_gate1_q_hat() -> float:
     the contract is unavailable. Never hardcodes the q_hat value (AGENTS.md §2).
     """
     try:
-        from contracts.gate1 import load_gate1_config  # type: ignore[import]
+        from contracts.calibration import load_gate1_config  # type: ignore[import]
 
         cfg = load_gate1_config()
         return float(cfg.q_hat)

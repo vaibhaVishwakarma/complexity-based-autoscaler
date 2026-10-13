@@ -35,7 +35,7 @@ from PIL import Image
 from tqdm import tqdm
 from pathlib import Path
 
-from contracts.gate1 import load_gate1_config, Gate1AciOnlineReport
+from contracts.calibration import load_gate1_config, Gate1AciOnlineReport
 
 # ── Block 1: Contract Ingestion ────────────────────────────────────────────────
 # Ingest calibration config dynamically via Pydantic contract (Rule 2: Decoupled Linkage)

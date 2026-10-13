@@ -72,7 +72,7 @@ QUEUE_UTILS: List[float] = [0.3, 0.7, 0.95]
 def get_fast_path_fraction() -> float:
     """Dynamically load fast_path_fraction from Gate 1 contract."""
     try:
-        from contracts.gate1 import load_gate1_config
+        from contracts.calibration import load_gate1_config
         cfg = load_gate1_config()
         return float(cfg.fast_path_fraction)
     except Exception as exc:

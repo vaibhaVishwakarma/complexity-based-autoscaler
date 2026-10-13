@@ -191,7 +191,7 @@ class InferLineExactController(_PlacementReplanMixin):
     def _load_capacity(self) -> float:
         """Load single-replica throughput μ_m from Gate 2 contract."""
         try:
-            from contracts.gate2 import load_gate2_profiles  # type: ignore[import]
+            from contracts.profiling import load_gate2_profiles  # type: ignore[import]
             profiles = load_gate2_profiles()
             return profiles.compute_service_capacity_rps(
                 batch_size=self.batch_size,
