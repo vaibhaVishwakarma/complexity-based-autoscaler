@@ -35,14 +35,9 @@ from PIL import Image
 from tqdm import tqdm
 from pathlib import Path
 
-# Add project root to sys.path to enable contracts import
-ROOT_DIR = Path(__file__).resolve().parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
 from contracts.gate1 import load_gate1_config, Gate1AciOnlineReport
 
-# ── Block 1: Path Resolution & Contract Ingestion ──────────────────────────────
+# ── Block 1: Contract Ingestion ────────────────────────────────────────────────
 # Ingest calibration config dynamically via Pydantic contract (Rule 2: Decoupled Linkage)
 ONNX_PATH = Path("models/efficientnet_b0_tiny.onnx")
 if not ONNX_PATH.is_file():

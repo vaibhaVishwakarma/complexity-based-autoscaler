@@ -13,9 +13,11 @@ These rules are active across the entire workspace. All agents, planners, and co
 - All operational variables, thresholds, tolerances, and filepaths must be defined in external config files (YAML/JSON).
 - Only static, immutable constants (e.g., standard seed `SEED = 42`) belong in code.
 
-## 3. Dedicated Workspace Virtual Environment
-- All Python commands, environment checks, evaluations, and tests MUST strictly use the workspace virtual environment located at `./.venv` (`/home/vaibo/edgecompute/.venv/bin/python`, `./.venv/bin/pytest`, etc.).
-- Never invoke system Python directly or use unverified global environments.
+## 3. Dedicated Workspace Virtual Environment & Root Module Execution Mandate
+- **Virtual Environment Discipline**: All Python commands, environment checks, evaluations, figure generations, and tests MUST strictly use the workspace virtual environment located at `./.venv` (`./.venv/bin/python`, `./.venv/bin/pytest`, etc.). Never invoke system Python directly or use unverified global environments.
+- **Root Directory Execution Only**: All files and scripts MUST be executed strictly from the repository root directory. Changing directories (`cd`) into subfolders or invoking scripts from arbitrary working directories is strictly forbidden.
+- **Module Execution Pattern (`-m`)**: All scripts MUST be run as Python modules via the `-m` flag (e.g. `./.venv/bin/python -m scripts.generate_testbed_figures` or `python3 -m <module>`). Running scripts via direct script paths (e.g., `python scripts/foo.py`) is prohibited.
+- **Zero Path Resolution Hacks**: Any ad-hoc path manipulation (including `sys.path.append()`, `sys.path.insert()`, or climbing parent directories with `Path(__file__).resolve().parent...` to force imports) is completely forbidden. All imports must be standard, clean package or module imports anchored from the repository root.
 
 ## 4. Self-Documenting Structure
 - Every script must feature a header docstring detailing its role, gate stage, inputs, and outputs.

@@ -28,9 +28,11 @@ These rules govern all pipeline gates, evaluation modules, scripts, and agent ac
 
 ---
 
-## Rule 3: Dedicated Workspace Virtual Environment
-- All Python scripts, tests, evaluations, and package inspections MUST strictly run using the repository's dedicated virtual environment located at `./.venv` (`/home/vaibo/edgecompute/.venv/bin/python`, `./.venv/bin/pytest`, etc.).
-- Never invoke system Python directly or rely on global Python packages.
+## Rule 3: Dedicated Workspace Virtual Environment & Root Module Execution Mandate
+- **Virtual Environment Discipline**: All Python scripts, tests, evaluations, and package inspections MUST strictly run using the repository's dedicated virtual environment located at `./.venv` (`./.venv/bin/python`, `./.venv/bin/pytest`, etc.). Never invoke system Python directly or rely on unverified global packages.
+- **Root Directory Execution Only**: All scripts and commands must be executed strictly from the workspace root directory. Changing working directories (`cd`) into subfolders is strictly forbidden.
+- **Module Execution Pattern (`-m`)**: All scripts MUST be invoked using the Python module execution flag `-m` (e.g., `./.venv/bin/python -m scripts.generate_testbed_figures` or `python3 -m <module>`). Invoking scripts via direct file paths (e.g., `python scripts/foo.py`) is prohibited.
+- **Zero Path Resolution Hacks**: Dynamic `sys.path` tampering (such as `sys.path.append()`, `sys.path.insert()`, or climbing directories using `Path(__file__).resolve().parent...` to resolve modules) is completely forbidden. All imports must be clean, absolute package/module imports anchored from the repository root.
 
 ---
 

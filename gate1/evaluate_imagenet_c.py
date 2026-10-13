@@ -47,10 +47,6 @@ from pathlib import Path
 from typing import Optional, List
 
 # Ingest Gate 1 Pydantic contracts (Rule 2: Decoupled Linkage)
-ROOT_DIR = Path(__file__).resolve().parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
-
 from contracts.gate1 import load_gate1_config, Gate1SelectiveRiskEntry
 
 try:

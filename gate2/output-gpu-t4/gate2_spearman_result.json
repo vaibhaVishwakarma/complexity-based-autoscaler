@@ -62,7 +62,7 @@
   "scrutiny_fixes": {
     "fix_A_queuing": "M/M/1 queue model at rho=[0.3, 0.7, 0.95]",
     "fix_B_constant_flop": "Disclosed \u2014 q2/q3/q4 identical by design",
-    "fix_C_fp_frac": "Updated 0.3827\u21920.50 (Gate 1 T=1.0 RAPS actual)",
+    "fix_C_fp_frac": "Updated to 0.5 (Gate 1 T=1.0 RAPS actual)",
     "fix_D_batch_wait": "W_batch=(b-1)/lambda*1000ms at lambda=50.0rps",
     "fix_E_jitter": "Gaussian sigma=5.0% of p50 added to slow-path",
     "fix_F_monotonicity": "Verified in profile_triton_service.py assert_monotonicity()"

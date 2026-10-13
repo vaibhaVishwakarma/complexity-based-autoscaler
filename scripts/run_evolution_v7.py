@@ -54,10 +54,6 @@ if _env_file.exists():
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip().strip("'\""))
 
-for p in [str(SRC_PATH), str(CONTINUUM_SRC), str(SCRIPTS_PATH), str(WORKSPACE_ROOT)]:
-    if p not in sys.path:
-        sys.path.insert(0, p)
-
 from openevolve import OpenEvolve
 from openevolve.config import Config
 
