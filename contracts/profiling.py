@@ -110,12 +110,12 @@ class Gate2SpearmanReport(BaseModel):
 
 
 def load_gate2_profiles(
-    path: str | Path = "gate2/output-gpu-t4/triton_service_profiles.json"
+    path: str | Path = "profiling/output-gpu-t4/triton_service_profiles.json"
 ) -> Gate2HardwareProfile:
-    """Load and type-validate Gate 2 service latency profiles."""
+    """Load and type-validate Hardware Profiling latency profiles."""
     file_path = Path(path)
     if not file_path.is_file():
-        raise FileNotFoundError(f"Gate 2 profile manifest not found at: {file_path.resolve()}")
+        raise FileNotFoundError(f"Hardware profile manifest not found at: {file_path.resolve()}")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -124,12 +124,12 @@ def load_gate2_profiles(
 
 
 def load_gate2_spearman(
-    path: str | Path = "gate2/output-gpu-t4/gate2_spearman_result.json"
+    path: str | Path = "profiling/output-gpu-t4/gate2_spearman_result.json"
 ) -> Gate2SpearmanReport:
-    """Load and type-validate Gate 2 Spearman correlation report."""
+    """Load and type-validate Queuing Spearman correlation report."""
     file_path = Path(path)
     if not file_path.is_file():
-        raise FileNotFoundError(f"Gate 2 Spearman result not found at: {file_path.resolve()}")
+        raise FileNotFoundError(f"Spearman result not found at: {file_path.resolve()}")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)

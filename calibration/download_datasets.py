@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Dict, Any
 
 # Standard dataset paths
-CONFIG_DIR = Path("gate1/configs")
+CONFIG_DIR = Path("calibration/configs")
 DATA_DIR = Path("data/tinyimagenet/val")
 AZURE_TRACE_PATH = Path("data/azure_traces/azure_functions_2019_processed.npz")
 IMAGENET_CLASS_INDEX_URL = "https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json"

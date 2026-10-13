@@ -56,9 +56,9 @@ except ImportError:
     HAS_IMAGECORRUPTIONS = False
 
 ONNX_PATH = Path("models/efficientnet_b0_tiny.onnx")
-CONFIG_PATH = Path("gate1/configs/calibration_config.json")
+CONFIG_PATH = Path("calibration/configs/calibration_config.json")
 DATA_DIR = Path("data/tinyimagenet/val")
-OUT_REPORT = Path("gate1/output/selective_error_report.json")
+OUT_REPORT = Path("calibration/output/selective_error_report.json")
 
 _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(1, 3, 1, 1)
 _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(1, 3, 1, 1)
@@ -106,18 +106,16 @@ def run_imagenet_c_benchmark(
     """
     # ── Block 1: Model & Config Resolution ─────────────────────────────────────
     if not onnx_path.is_file():
-        alt_onnx = Path("gate1/output/efficientnet_b0_tiny.onnx")
+        alt_onnx = Path("calibration/output/efficientnet_b0_tiny.onnx")
         if alt_onnx.is_file():
             onnx_path = alt_onnx
+        elif Path("gate1/output/efficientnet_b0_tiny.onnx").is_file():
+            onnx_path = Path("gate1/output/efficientnet_b0_tiny.onnx")
         else:
             raise FileNotFoundError(f"ERROR: ONNX model graph missing at {onnx_path}!")
 
     if not config_path.is_file():
-        alt_cfg = Path("gate1/calibration_config.json")
-        if alt_cfg.is_file():
-            config_path = alt_cfg
-        else:
-            raise FileNotFoundError(f"ERROR: Calibration config missing at {config_path}!")
+        raise FileNotFoundError(f"ERROR: Calibration config missing at {config_path}!")
 
     # Ingest typed contract
     contract = load_gate1_config(config_path)

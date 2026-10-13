@@ -122,9 +122,9 @@ class Gate1SelectiveRiskEntry(BaseModel):
     aci_coverage_target: Optional[float] = None
 
 
-def load_gate1_config(path: str | Path = "gate1/configs/calibration_config.json") -> Gate1CalibrationConfig:
+def load_gate1_config(path: str | Path = "calibration/configs/calibration_config.json") -> Gate1CalibrationConfig:
     """
-    Load and type-validate Gate 1 configuration from disk.
+    Load and type-validate Calibration configuration from disk.
     
     Raises:
         FileNotFoundError: If the specified config file does not exist.
@@ -132,7 +132,7 @@ def load_gate1_config(path: str | Path = "gate1/configs/calibration_config.json"
     """
     file_path = Path(path)
     if not file_path.is_file():
-        raise FileNotFoundError(f"Gate 1 configuration not found at: {file_path.resolve()}")
+        raise FileNotFoundError(f"Calibration configuration not found at: {file_path.resolve()}")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -141,13 +141,13 @@ def load_gate1_config(path: str | Path = "gate1/configs/calibration_config.json"
     return Gate1CalibrationConfig.model_validate(data)
 
 
-def load_gate1_aci_report(path: str | Path = "gate1/output/aci_online_report.json") -> Gate1AciOnlineReport:
+def load_gate1_aci_report(path: str | Path = "calibration/output/aci_online_report.json") -> Gate1AciOnlineReport:
     """
-    Load and type-validate Gate 1 ACI online benchmark report.
+    Load and type-validate Calibration ACI online benchmark report.
     """
     file_path = Path(path)
     if not file_path.is_file():
-        raise FileNotFoundError(f"Gate 1 ACI report not found at: {file_path.resolve()}")
+        raise FileNotFoundError(f"Calibration ACI report not found at: {file_path.resolve()}")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -156,14 +156,14 @@ def load_gate1_aci_report(path: str | Path = "gate1/output/aci_online_report.jso
 
 
 def load_gate1_selective_risk_report(
-    path: str | Path = "gate1/output/selective_error_report.json"
+    path: str | Path = "calibration/output/selective_error_report.json"
 ) -> List[Gate1SelectiveRiskEntry]:
     """
-    Load and type-validate Gate 1 Selective Risk (ImageNet-C) report.
+    Load and type-validate Calibration Selective Risk (ImageNet-C) report.
     """
     file_path = Path(path)
     if not file_path.is_file():
-        raise FileNotFoundError(f"Gate 1 Selective Risk report not found at: {file_path.resolve()}")
+        raise FileNotFoundError(f"Calibration selective risk report not found at: {file_path.resolve()}")
 
     with open(file_path, "r", encoding="utf-8") as f:
         data = json.load(f)

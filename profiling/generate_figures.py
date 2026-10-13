@@ -19,14 +19,14 @@ import logging
 from pathlib import Path
 from typing import Any, Dict
 
-from gate2.profile_triton_service import render_profiling_figure
+from profiling.profile_triton_service import render_profiling_figure
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("Gate2FigureGen")
+logger = logging.getLogger("ProfilingFigureGen")
 
-GATE2_DIR = Path("gate2")
-GPU_DIR = GATE2_DIR / "output-gpu-t4"
-CPU_DIR = GATE2_DIR / "output-cpu-c7i"
+PROFILING_DIR = Path("profiling")
+GPU_DIR = PROFILING_DIR / "output-gpu-t4"
+CPU_DIR = PROFILING_DIR / "output-cpu-c7i"
 
 
 def generate_for_pathway(dir_path: Path, label: str) -> None:

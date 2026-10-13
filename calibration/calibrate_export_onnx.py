@@ -53,8 +53,8 @@ parser.add_argument("--temp",       type=float, default=1.0,   help="Temperature
 parser.add_argument("--lambda-reg", type=float, default=0.01,  help="RAPS regularization penalty lambda (Angelopoulos et al. ICLR 2021)")
 parser.add_argument("--k-reg",      type=int,   default=5,     help="RAPS rank cutoff k_reg (regularization kicks in after rank k_reg)")
 parser.add_argument("--cal-size",   type=int,   default=5000,  help="Calibration split size")
-parser.add_argument("--out-dir",    type=str,   default="gate1/output", help="Directory for benchmark outputs")
-parser.add_argument("--config-dir", type=str,   default="gate1/configs", help="Directory for fixed configs")
+parser.add_argument("--out-dir",    type=str,   default="calibration/output", help="Directory for benchmark outputs")
+parser.add_argument("--config-dir", type=str,   default="calibration/configs", help="Directory for fixed configs")
 parser.add_argument("--model-dir",  type=str,   default="models", help="Directory for model checkpoints/ONNX")
 args = parser.parse_args()
 
@@ -74,15 +74,15 @@ np.random.seed(RANDOM_SEED)
 torch.manual_seed(RANDOM_SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 1. Load class mapping from gate1/configs/ (with fallbacks)
+# 1. Load class mapping from calibration/configs/
 mapping_candidates = [
     os.path.join(args.config_dir, "tiny_class_mapping.json"),
-    os.path.join("gate1", "configs", "tiny_class_mapping.json"),
+    os.path.join("calibration", "configs", "tiny_class_mapping.json"),
     os.path.join(args.out_dir, "tiny_class_mapping.json"),
 ]
 mapping_path = next((p for p in mapping_candidates if os.path.exists(p)), mapping_candidates[0])
 if not os.path.exists(mapping_path):
-    raise FileNotFoundError(f"ERROR: Class mapping missing at {mapping_path}! Run python3 gate1/download_datasets.py first.")
+    raise FileNotFoundError(f"ERROR: Class mapping missing at {mapping_path}! Run python3 -m calibration.download_datasets first.")
 
 with open(mapping_path) as f:
     raw_mapping = json.load(f)

@@ -46,8 +46,8 @@ parser.add_argument("--temp",       type=float, default=0.70,  help="Inference t
 parser.add_argument("--kd-temp",    type=float, default=4.0,   help="Distillation temperature T_KD")
 parser.add_argument("--kd-alpha",   type=float, default=0.70,  help="KD loss weight alpha_KD")
 parser.add_argument("--cal-size",   type=int,   default=5000,  help="Calibration split size")
-parser.add_argument("--out-dir",    type=str,   default="gate1/output", help="Directory for training/evaluation outputs")
-parser.add_argument("--config-dir", type=str,   default="gate1/configs", help="Directory for fixed configs")
+parser.add_argument("--out-dir",    type=str,   default="calibration/output", help="Directory for training/evaluation outputs")
+parser.add_argument("--config-dir", type=str,   default="calibration/configs", help="Directory for fixed configs")
 parser.add_argument("--model-dir",  type=str,   default="models", help="Directory for models/ONNX")
 args = parser.parse_args()
 

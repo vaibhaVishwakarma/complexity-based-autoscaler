@@ -49,9 +49,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("Gate2Profiling")
 
 # Workspace Paths (Anchored at Root)
-GATE2_DIR = Path("gate2")
-OUTPUT_GPU_DIR = GATE2_DIR / "output-gpu-t4"
-OUTPUT_CPU_DIR = GATE2_DIR / "output-cpu-c7i"
+PROFILING_DIR = Path("profiling")
+OUTPUT_GPU_DIR = PROFILING_DIR / "output-gpu-t4"
+OUTPUT_CPU_DIR = PROFILING_DIR / "output-cpu-c7i"
 
 # Fixed Constants (AGENTS.md Rule #2)
 SEED: int = 42

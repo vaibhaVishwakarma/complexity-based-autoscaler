@@ -41,22 +41,18 @@ from contracts.calibration import load_gate1_config, Gate1AciOnlineReport
 # Ingest calibration config dynamically via Pydantic contract (Rule 2: Decoupled Linkage)
 ONNX_PATH = Path("models/efficientnet_b0_tiny.onnx")
 if not ONNX_PATH.is_file():
-    alt_onnx = Path("gate1/output/efficientnet_b0_tiny.onnx")
+    alt_onnx = Path("calibration/output/efficientnet_b0_tiny.onnx")
     if alt_onnx.is_file():
         ONNX_PATH = alt_onnx
     else:
         raise FileNotFoundError(f"ONNX model graph missing at {ONNX_PATH}!")
 
-CONFIG_PATH = Path("gate1/configs/calibration_config.json")
+CONFIG_PATH = Path("calibration/configs/calibration_config.json")
 if not CONFIG_PATH.is_file():
-    alt_cfg = Path("gate1/calibration_config.json")
-    if alt_cfg.is_file():
-        CONFIG_PATH = alt_cfg
-    else:
-        raise FileNotFoundError(f"Calibration config missing at {CONFIG_PATH}!")
+    raise FileNotFoundError(f"Calibration config missing at {CONFIG_PATH}!")
 
 DATA_DIR = Path("data/tinyimagenet/val")
-OUT_REPORT = Path("gate1/output/aci_online_report.json")
+OUT_REPORT = Path("calibration/output/aci_online_report.json")
 OUT_REPORT.parent.mkdir(parents=True, exist_ok=True)
 
 # Ingest and validate contract schema

@@ -66,7 +66,7 @@ class TritonDynamicBatchingModel:
         Dynamically instantiate model from Gate 2 authoritative profiling manifest.
         Falls back to empirically fitted Tesla T4 constants if file is absent.
         """
-        default_path = Path("gate2/output-gpu-t4/triton_service_profiles.json")
+        default_path = Path("profiling/output-gpu-t4/triton_service_profiles.json")
         target_path = Path(manifest_path) if manifest_path else default_path
 
         if target_path.is_file():

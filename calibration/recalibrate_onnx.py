@@ -27,28 +27,20 @@ import onnxruntime as ort
 from PIL import Image
 
 ONNX_PATH   = "models/efficientnet_b0_tiny.onnx"
-CONFIG_PATH = "gate1/configs/calibration_config.json"
+CONFIG_PATH = "calibration/configs/calibration_config.json"
 DATA_DIR    = "data/tinyimagenet/val"
 
 if not os.path.exists(ONNX_PATH):
-    if os.path.exists("gate1/output/efficientnet_b0_tiny.onnx"):
-        ONNX_PATH = "gate1/output/efficientnet_b0_tiny.onnx"
-    else:
-        raise FileNotFoundError(
-            f"ERROR: ONNX model graph not found at {ONNX_PATH}!\n"
-            "Ensure models/efficientnet_b0_tiny.onnx exists or run `python3 -m gate1.train_distill`."
-        )
+    raise FileNotFoundError(
+        f"ERROR: ONNX model graph not found at {ONNX_PATH}!\n"
+        "Ensure models/efficientnet_b0_tiny.onnx exists or run `python3 -m calibration.train_distill`."
+    )
 
 if not os.path.exists(CONFIG_PATH):
-    if os.path.exists("gate1/calibration_config.json"):
-        CONFIG_PATH = "gate1/calibration_config.json"
-    elif os.path.exists("gate1/output/calibration_config.json"):
-        CONFIG_PATH = "gate1/output/calibration_config.json"
-    else:
-        raise FileNotFoundError(
-            f"ERROR: Calibration config file not found at {CONFIG_PATH}!\n"
-            "Ensure gate1/configs/calibration_config.json exists."
-        )
+    raise FileNotFoundError(
+        f"ERROR: Calibration config file not found at {CONFIG_PATH}!\n"
+        "Ensure calibration/configs/calibration_config.json exists."
+    )
 
 with open(CONFIG_PATH) as f:
     cfg = json.load(f)
