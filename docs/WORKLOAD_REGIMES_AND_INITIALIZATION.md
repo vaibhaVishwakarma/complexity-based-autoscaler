@@ -1,11 +1,11 @@
 # Workload Regimes & Simulation Initialization Specification
 
 **Document Role**: Authoritative, executable reference for multi-tier workload regimes, closed-form arrival patterns, queueing service rates, and simulation initialization across IoT, Edge, and Cloud tiers.  
-**Associated Configs**: [`configs/suites/`](file:///home/vaibo/edgecompute/configs/suites/)  
-**Generator Implementation**: [`src/continuum_ext/workload/conformal_workloads.py`](file:///home/vaibo/edgecompute/src/continuum_ext/workload/conformal_workloads.py)  
-**Hardware Profile Grounding**: [`contracts/gate2.py`](file:///home/vaibo/edgecompute/contracts/gate2.py) & [`gate2/output-gpu-t4/triton_service_profiles.json`](file:///home/vaibo/edgecompute/gate2/output-gpu-t4/triton_service_profiles.json)  
+**Associated Configs**: [`configs/suites/`](file:///home/vaibo/auto-edgecompute/configs/suites/)  
+**Generator Implementation**: [`src/continuum_ext/workload/conformal_workloads.py`](file:///home/vaibo/auto-edgecompute/src/continuum_ext/workload/conformal_workloads.py)  
+**Hardware Profile Grounding**: [`contracts/gate2.py`](file:///home/vaibo/auto-edgecompute/contracts/gate2.py) & [`gate2/output-gpu-t4/triton_service_profiles.json`](file:///home/vaibo/auto-edgecompute/gate2/output-gpu-t4/triton_service_profiles.json)  
 **Dataset Integrity**: `data/azure_traces/azure_functions_2019_processed.npz` (SHA256: `9aeabacb08f01b34f46efc252db76248a55094cdae1f0e86c8eda39fa09b7447`)  
-**Governance Compliance**: Adheres strictly to [`AGENTS.md`](file:///home/vaibo/edgecompute/AGENTS.md) Rules #1, #2, #5, and #6.
+**Governance Compliance**: Adheres strictly to [`AGENTS.md`](file:///home/vaibo/auto-edgecompute/AGENTS.md) Rules #1, #2, #5, and #6.
 
 ---
 
@@ -38,7 +38,7 @@ In distributed edge-cloud continuum computing, autoscaling evaluations require r
 ```
 
 ### 1.1 Triage Routing & Cloud Load Formulation
-1. **RAPS Prediction Sets**: Edge inference evaluates each frame $x_i$ using Regularized Adaptive Prediction Sets (RAPS) calibrated at miscoverage level $\alpha = 0.10$ ($\hat{q} = 0.79914$, [`contracts/gate1.py`](file:///home/vaibo/edgecompute/contracts/gate1.py)).
+1. **RAPS Prediction Sets**: Edge inference evaluates each frame $x_i$ using Regularized Adaptive Prediction Sets (RAPS) calibrated at miscoverage level $\alpha = 0.10$ ($\hat{q} = 0.79914$, [`contracts/gate1.py`](file:///home/vaibo/auto-edgecompute/contracts/gate1.py)).
 2. **Deterministic Routing Rule**:
    $$\text{Route}(x_i) = \begin{cases} \text{Fast-Path (Local Edge Sink)}, & |C(x_i)| = 1 \\ \text{Slow-Path (Cloud GPU Worker Pool)}, & |C(x_i)| \ge 2 \end{cases}$$
 3. **Empirical Fast-Path Acceptance Ratio $p_{\text{fast}}(t)$**:
@@ -57,7 +57,7 @@ $$\text{Capacity} = \left\lfloor \text{workers} \cdot \frac{T_e}{T_{\text{proc}}
 ### 2.1 Calibrated Service Times Grounded in Gate 2 Profiling
 - **EdgePreprocess**: $T_{\text{proc}} = 0.002\text{ s} \implies \mu = 500\text{ RPS}$ (multi-threaded CPU normalization).
 - **EdgeInference**: $T_{\text{proc}} = 0.003\text{ s} \implies \mu = 333\text{ RPS}$ (multi-core ONNX runtime execution on 24-core Edge node). Edge stages provide guaranteed headroom ($>300\text{ RPS}$) so bottlenecks are never masked by edge CPU starvation.
-- **CloudRefineWorker**: Calibrated to empirical Gate 2 Tesla T4 GPU profiling ([`triton_service_profiles.json`](file:///home/vaibo/edgecompute/gate2/output-gpu-t4/triton_service_profiles.json)):
+- **CloudRefineWorker**: Calibrated to empirical Gate 2 Tesla T4 GPU profiling ([`triton_service_profiles.json`](file:///home/vaibo/auto-edgecompute/gate2/output-gpu-t4/triton_service_profiles.json)):
   - Profiled batch size $B=8$ latency: $T_{\text{exec}} = 62.67\text{ ms} \approx 0.0625\text{ s}$.
   - Service rate per worker: $\mu_{\text{worker}} = \lfloor 1.0 / 0.0625 \rfloor = \mathbf{16.0\text{ RPS/worker}}$.
   - Cluster scaling capacity:

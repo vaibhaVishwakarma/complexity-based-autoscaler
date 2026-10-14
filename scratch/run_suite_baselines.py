@@ -22,7 +22,7 @@ import time
 from pathlib import Path
 import pandas as pd
 
-WORKSPACE_ROOT = Path("/home/vaibo/edgecompute")
+WORKSPACE_ROOT = Path("/home/vaibo/auto-edgecompute")
 SUITES_DIR = WORKSPACE_ROOT / "configs" / "suites"
 OUTPUT_DIR = WORKSPACE_ROOT / "output" / "suite_baselines_runs"
 PYTHON_BIN = WORKSPACE_ROOT / ".venv" / "bin" / "python"

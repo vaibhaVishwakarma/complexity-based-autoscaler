@@ -171,7 +171,7 @@ def generate_markdown_report(
         "",
         "**Document Role**: Authoritative publication-grade statistical verification certifying the empirical superiority and distribution-shift resilience of Evolved Conformal Policy v7 (Rank 2 Champion `c614055a`) across independent stochastic realizations.",
         f"**Date Generated**: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
-        r"**Evaluated Champion**: `c614055a` ([`output/champion_policy_v7_smooth.py`](file:///home/vaibo/edgecompute/output/champion_policy_v7_smooth.py))",
+        r"**Evaluated Champion**: `c614055a` ([`output/champion_policy_v7_smooth.py`](file:///home/vaibo/auto-edgecompute/output/champion_policy_v7_smooth.py))",
         f"**Evaluated Stochastic Seeds (N={len(seeds_list)})**: `{seeds_list}`",
         f"**Evaluated Regimes (R={len(regimes_list)})**: `{regimes_list}`",
         f"**Total Simulation Runs**: `{total_runs:,}` runs",
@@ -245,15 +245,67 @@ def generate_markdown_report(
             )
         lines.append("")
 
+    takeaways = []
+    inferline_tests = hypothesis_results.get("inferline", {})
+    cost_test = inferline_tests.get("worker_seconds", {})
+    miss_test = inferline_tests.get("deadline_misses", {})
+    churn_test = inferline_tests.get("scaling_deltas", {})
+
+    if cost_test:
+        mean_diff = cost_test.get("mean_diff", 0.0)
+        p_val = cost_test.get("wilcoxon_pvalue", 1.0)
+        sig = cost_test.get("significant_at_0_01", False)
+        if sig and mean_diff < 0:
+            takeaways.append(
+                f"1. **Cost Comparison vs InferLine**: Statistically significant cost reduction (mean difference Δ = {mean_diff:.1f} ws, p = {p_val:.4e} < 0.01)."
+            )
+        elif sig and mean_diff > 0:
+            takeaways.append(
+                f"1. **Cost Comparison vs InferLine**: InferLine demonstrates lower worker-seconds (mean difference Δ = {mean_diff:+.1f} ws, p = {p_val:.4e} < 0.01)."
+            )
+        else:
+            takeaways.append(
+                f"1. **Cost Comparison vs InferLine**: No statistically significant difference in worker-seconds detected at α = 0.01 (mean difference Δ = {mean_diff:+.1f} ws, p = {p_val:.4f})."
+            )
+
+    if miss_test:
+        champ_misses = miss_test.get("mean_champ", 0.0)
+        base_misses = miss_test.get("mean_base", 0.0)
+        p_val = miss_test.get("wilcoxon_pvalue", 1.0)
+        sig = miss_test.get("significant_at_0_01", False)
+        if champ_misses == 0.0:
+            takeaways.append(
+                f"2. **SLA Compliance**: Evolved Policy v7 maintains zero deadline misses across all evaluated runs (mean misses = {champ_misses:.2f} vs InferLine = {base_misses:.2f}, p = {p_val:.4f})."
+            )
+        else:
+            takeaways.append(
+                f"2. **SLA Compliance**: Evolved Policy v7 incurs mean misses = {champ_misses:.2f} vs InferLine = {base_misses:.2f} (p = {p_val:.4f})."
+            )
+
+    if churn_test:
+        mean_diff = churn_test.get("mean_diff", 0.0)
+        p_val = churn_test.get("wilcoxon_pvalue", 1.0)
+        sig = churn_test.get("significant_at_0_01", False)
+        if sig and mean_diff < 0:
+            takeaways.append(
+                f"3. **Actuation Stability**: Statistically significant reduction in actuation churn compared to InferLine (Δ = {mean_diff:.1f} flaps, p = {p_val:.4e} < 0.01)."
+            )
+        else:
+            takeaways.append(
+                f"3. **Actuation Stability**: Actuation churn difference vs InferLine is Δ = {mean_diff:+.1f} flaps (p = {p_val:.4f}, significant at 0.01: {sig})."
+            )
+
+    if not takeaways:
+        takeaways.append("1. **Data Collection Incomplete**: Awaiting sufficient run samples for hypothesis testing.")
+
     lines.extend([
         "---",
         "",
         "## 3. Key Takeaways & Publication Readiness",
         "",
-        "1. **Cost Dominance Across Stochastic Seeds**: Confirms Evolved Policy v7 consistently maintains superior cost savings over InferLine across unseen stochastic realizations.",
-        "2. **Zero-Miss Reliability**: Confirms Evolved Policy v7 guarantees 100% SLA compliance without deadline degradation across randomized inter-arrival seeds.",
-        r"3. **Actuation Stability**: Confirms the dramatic reduction in controller flapping ($>75\%$ lower churn than InferLine and 11.1% smoother than v7 Rank 1).",
+        *takeaways,
     ])
+
 
     content = "\n".join(lines) + "\n"
     with open(report_path, "w", encoding="utf-8") as f:

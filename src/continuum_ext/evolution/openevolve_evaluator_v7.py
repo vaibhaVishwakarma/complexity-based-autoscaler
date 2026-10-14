@@ -73,10 +73,23 @@ SUITES_DIR = WORKSPACE_ROOT / "configs" / "suites"
 EVOLUTION_OUTPUT_DIR = WORKSPACE_ROOT / "output" / "evolution_runs_v7"
 SEED_POLICY_V7_PATH = WORKSPACE_ROOT / "src" / "continuum_ext" / "evolution" / "seed_policy_v7.py"
 
-# Baseline reference constants grounded in Gate calibration and Step 8.5
-FIXED_CAPACITY_WORKER_SECONDS: float = 27_900.0
-INFERLINE_CANONICAL_COST_WS: float = 14_261.0
-INFERLINE_REALISM_COST_WS: float = 11_350.0
+# Baseline reference constants dynamically loaded from authoritative Step 5 manifest (AGENTS.md Rule #2)
+try:
+    from contracts.baselines import load_baselines_manifest
+    _baselines_manifest = load_baselines_manifest(WORKSPACE_ROOT / "output" / "suite_baselines_runs" / "manifest.json")
+    FIXED_CAPACITY_WORKER_SECONDS: float = float(_baselines_manifest.aggregates.fixed_capacity_worker_seconds)
+    INFERLINE_CANONICAL_COST_WS: float = float(_baselines_manifest.aggregates.inferline_canonical_cost_ws)
+    INFERLINE_REALISM_COST_WS: float = float(_baselines_manifest.aggregates.inferline_realism_cost_ws or 11_350.0)
+    logger.info(
+        f"Loaded authoritative baseline manifest: Fixed={FIXED_CAPACITY_WORKER_SECONDS:.0f} ws, "
+        f"InferLine={INFERLINE_CANONICAL_COST_WS:.0f} ws."
+    )
+except Exception as _e:
+    logger.warning(f"Could not load authoritative baseline manifest: {_e}. Falling back to default baseline reference.")
+    FIXED_CAPACITY_WORKER_SECONDS = 27_900.0
+    INFERLINE_CANONICAL_COST_WS = 8_743.0
+    INFERLINE_REALISM_COST_WS = 11_350.0
+
 
 # ── Canonical 13 Evaluation Regimes (Baseline T_init = 1.0s) ──────────────────
 ALL_CANONICAL_REGIMES = [
@@ -373,6 +386,11 @@ def _run_single_simulation(
         stab = summary.get("stability", {})
         delay = summary.get("delay_breakdown_s", {})
 
+        rel = summary.get("reliability", {})
+        completions = summary.get("completions", {})
+        completed_count = int(rel.get("completed_tasks", completions.get("count", 0)))
+        generated_count = int(rel.get("generated_tasks", completions.get("generated", completed_count)))
+
         # ── True SLO Accountability in v7 ───────────────────────────────────
         # qos.get("slo_violation_count", 0) counts both completed deadline misses
         # AND unserved requests abandoned in intermediate queues past deadline.
@@ -383,8 +401,8 @@ def _run_single_simulation(
         result_data = {
             "regime": regime,
             "startup_delay_s": float(startup_delay_s),
-            "completed": int(qos.get("slo_eligible_count", 0)),
-            "generated": int(qos.get("slo_eligible_count", 0)),
+            "completed": completed_count,
+            "generated": generated_count,
             "deadline_misses": true_misses,
             "unserved_queue_abandoned": max(0, slo_violations - deadline_misses),
             "worker_seconds": float(cost.get("total_provisioned_worker_seconds", 0.0)),
@@ -393,6 +411,7 @@ def _run_single_simulation(
             "queue_wait_mean_s": float(delay.get("queue_wait_s", {}).get("mean", 0.0)),
             "elapsed_s": elapsed,
         }
+
 
         # Ephemeral disk pruning: remove raw simulation run directory to preserve disk space
         try:

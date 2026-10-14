@@ -71,7 +71,13 @@ def _find_azure_trace_path() -> Path:
         candidate = parent / "data" / "azure_traces" / "azure_functions_2019_processed.npz"
         if candidate.exists():
             return candidate
-    return Path("/home/vaibo/edgecompute/data/azure_traces/azure_functions_2019_processed.npz")
+    cwd_candidate = Path.cwd() / "data" / "azure_traces" / "azure_functions_2019_processed.npz"
+    if cwd_candidate.exists():
+        return cwd_candidate
+    raise FileNotFoundError(
+        "Azure trace not found at data/azure_traces/azure_functions_2019_processed.npz. "
+        "External workspace fallbacks are forbidden per AGENTS.md Rule #3."
+    )
 
 
 #: Absolute path to the Azure Functions 2019 processed trace (authoritative source).
@@ -932,4 +938,4 @@ def build_2d_stream(config: dict, seed: int) -> "WorkloadStream2D":
             seed=seed,
         )
 
-    raise ValueError(f"Unsupported 2D workload generator: '{generator}'")
+    raise ValueError(f"Unsupported workload generator: '{generator}'")

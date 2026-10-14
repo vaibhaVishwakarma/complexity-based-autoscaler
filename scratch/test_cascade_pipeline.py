@@ -11,7 +11,7 @@ from pathlib import Path
 from openevolve.config import Config
 from openevolve.evaluator import Evaluator
 
-WORKSPACE_ROOT = Path("/home/vaibo/edgecompute")
+WORKSPACE_ROOT = Path("/home/vaibo/auto-edgecompute")
 CONFIG_PATH = WORKSPACE_ROOT / "configs" / "evolution" / "openevolve_config.yaml"
 SEED_PATH = WORKSPACE_ROOT / "src" / "continuum_ext" / "evolution" / "seed_policy.py"
 EVALUATOR_FILE = WORKSPACE_ROOT / "src" / "continuum_ext" / "evolution" / "openevolve_evaluator.py"

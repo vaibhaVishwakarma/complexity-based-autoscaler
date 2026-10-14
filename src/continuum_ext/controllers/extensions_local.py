@@ -127,22 +127,22 @@ def build(name: str, config: Dict[str, Any], runner: Any) -> Optional[Any]:
             replan_every_epochs=int(placement_cfg.get("place_every_epochs", 3)),
         )
 
-    if name in {"inferline", "inferline_controller"}:
+    if name in {"inferline", "inferline_controller", "inferline_exact"}:
         try:
-            from continuum_bench.controllers.conformal_controllers import InferLineController
+            from continuum_ext.controllers.inferline_exact import InferLineExactController
         except ImportError:
-            from continuum_ext.controllers.conformal_controllers import InferLineController
+            from src.continuum_ext.controllers.inferline_exact import InferLineExactController
 
         inferline_cfg = config.get("autoscaling", {}).get("inferline", {})
         placement_cfg = config.get("placement", {})
-        return InferLineController(
+        return InferLineExactController(
             placement_strategy=str(placement_cfg.get("strategy", "best_fit")),
             replan_every_epochs=int(placement_cfg.get("place_every_epochs", 3)),
-            alpha_fast=float(inferline_cfg.get("alpha_fast", 0.60)),
-            alpha_mid=float(inferline_cfg.get("alpha_mid", 0.20)),
-            alpha_slow=float(inferline_cfg.get("alpha_slow", 0.05)),
+            invocation_prob=float(inferline_cfg.get("invocation_prob", 0.50)),
+            rho_m=float(inferline_cfg.get("rho_m", 1.0)),
             stabilise_epochs=int(inferline_cfg.get("stabilise_epochs", 15)),
-            safety_margin=float(inferline_cfg.get("safety_margin", 1.15)),
+            scaledown_window_epochs=int(inferline_cfg.get("scaledown_window_epochs", 30)),
+            bucket_size_epochs=int(inferline_cfg.get("bucket_size_epochs", 5)),
             min_replicas=int(inferline_cfg.get("min_replicas", 1)),
             cooldown_epochs=int(inferline_cfg.get("cooldown_epochs", 2)),
         )
@@ -333,11 +333,14 @@ class EvolvedConformalController(_PlacementReplanMixin):
         booting_workers = int(snapshot.starting_workers) if snapshot else 0
         time_since_last_scale_s = (state.epoch - self._last_scale_epoch) * self._step_seconds
 
+        # Dynamic worker service capacity (AGENTS.md Rule #2 zero-hardcoding)
+        worker_capacity_rps = float(meta.get("worker_capacity_rps", self._WORKER_CAPACITY_RPS))
+
         # Tier 2: Traffic dynamics
         ingress_rps = float(meta.get("ingress_lambda", 0.0))
         if ingress_rps <= 0.0:
             capacity_denominator = max(1, active_workers)
-            ingress_rps = cloud_queue_depth * (self._WORKER_CAPACITY_RPS / float(capacity_denominator))
+            ingress_rps = cloud_queue_depth * (worker_capacity_rps / float(capacity_denominator))
 
         # Update sliding windows for velocity/acceleration computation
         self._p_fast_history.append(p_fast)
@@ -365,7 +368,7 @@ class EvolvedConformalController(_PlacementReplanMixin):
             active_workers=active_workers,
             booting_workers=booting_workers,
             time_since_last_scale_s=time_since_last_scale_s,
-            worker_capacity_rps=self._WORKER_CAPACITY_RPS,
+            worker_capacity_rps=worker_capacity_rps,
             sla_deadline_s=self._SLA_DEADLINE_S,
         )
 

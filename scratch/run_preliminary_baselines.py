@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 
-WORKSPACE_ROOT = Path("/home/vaibo/edgecompute")
+WORKSPACE_ROOT = Path("/home/vaibo/auto-edgecompute")
 CONFIG_PATH = WORKSPACE_ROOT / "configs" / "preliminary_multinode_split_inference.yaml"
 OUTPUT_DIR = WORKSPACE_ROOT / "output" / "preliminary_runs"
 PYTHON_BIN = WORKSPACE_ROOT / ".venv" / "bin" / "python"

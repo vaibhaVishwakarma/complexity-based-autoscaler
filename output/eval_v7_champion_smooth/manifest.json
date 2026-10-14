@@ -1,0 +1,30 @@
+{
+  "timestamp": 1791952161.1441004,
+  "generated_at": "2026-10-14T04:29:21Z",
+  "candidate": "/home/vaibo/auto-edgecompute/output/champion_policy_v7_smooth.py",
+  "total_runs": 135,
+  "delays": [
+    1.0,
+    5.0,
+    10.0,
+    20.0,
+    50.0,
+    100.0,
+    150.0,
+    200.0,
+    300.0
+  ],
+  "regimes": [
+    "suite1_spike",
+    "suite2_shock",
+    "suite3_azure"
+  ],
+  "controllers": [
+    "evolved_conformal",
+    "inferline",
+    "hpa",
+    "keda",
+    "fixed_capacity"
+  ],
+  "total_nulls": 0
+}

@@ -368,12 +368,16 @@ def synthesize_markdown_report(
     report_path: Path,
     seeds: List[int],
     champion_path: Path,
+    regimes: Optional[List[str]] = None,
 ) -> None:
     """Generates a publication-grade markdown statistical report."""
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
+    eval_regimes = regimes if regimes is not None else ALL_REGIMES
+    fixed_cdf = df[df["controller_key"] == "fixed_capacity"]
+    fixed_mean_cost = fixed_cdf["worker_seconds"].mean() if not fixed_cdf.empty else 2146.0
+
     summary_rows = []
-    fixed_mean_cost = 2146.0  # reference fixed peak cost
     for ctrl_key, ctrl_name in CONTROLLERS:
         cdf = df[df["controller_key"] == ctrl_key]
         if cdf.empty:
@@ -401,8 +405,9 @@ def synthesize_markdown_report(
         f"- **Evaluated Policy Artifact**: [`{champion_path.name}`]({champion_path})",
         f"- **Timestamp**: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}",
         f"- **Stochastic Seeds (N={len(seeds)})**: `{seeds}`",
-        f"- **Evaluated Regimes (R={len(ALL_REGIMES)})**: `{ALL_REGIMES}`",
+        f"- **Evaluated Regimes (R={len(eval_regimes)})**: `{eval_regimes}`",
         f"- **Total Simulations**: {len(df)} runs",
+
         f"",
         f"---",
         f"",
@@ -551,7 +556,9 @@ def main() -> None:
         report_path=args.report,
         seeds=seeds,
         champion_path=args.candidate,
+        regimes=regimes,
     )
+
 
     print("\n" + "=" * 70)
     print("STEP 8 v7 MULTI-SEED VALIDATION COMPLETE")

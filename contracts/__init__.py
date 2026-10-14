@@ -21,6 +21,13 @@ from contracts.profiling import (
     load_gate2_spearman,
 )
 
+from contracts.baselines import (
+    BaselineRunResult,
+    BaselineAggregateMetrics,
+    BaselineManifest,
+    load_baselines_manifest,
+)
+
 # Canonical aliases
 CalibrationConfig = Gate1CalibrationConfig
 CalibrationPassStatus = Gate1PassStatus
@@ -46,6 +53,10 @@ __all__ = [
     "Gate2SpearmanReport",
     "load_gate2_profiles",
     "load_gate2_spearman",
+    "BaselineRunResult",
+    "BaselineAggregateMetrics",
+    "BaselineManifest",
+    "load_baselines_manifest",
     "CalibrationConfig",
     "CalibrationPassStatus",
     "HardwareProfile",
@@ -54,3 +65,4 @@ __all__ = [
     "load_hardware_profiles",
     "load_spearman_report",
 ]
+

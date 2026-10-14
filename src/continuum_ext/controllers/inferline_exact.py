@@ -251,19 +251,30 @@ class InferLineExactController(_PlacementReplanMixin):
             r_max = max(r_max, r_i)
         return r_max
 
-    def _algorithm3_desired(self, r_max: float, snapshot) -> int:
+    def _resolve_capacity(self, stage: str, state: Optional[ControllerState] = None) -> float:
+        """Resolve worker throughput capacity mu dynamically without hardcoding."""
+        if state is not None and getattr(state, "metadata", None):
+            stage_cap = state.metadata.get("worker_capacity_by_stage", {}).get(stage)
+            if stage_cap is not None:
+                return max(1e-9, float(stage_cap))
+            if "worker_capacity_rps" in state.metadata:
+                return max(1e-9, float(state.metadata["worker_capacity_rps"]))
+        return max(1e-9, self._capacity_rps)
+
+    def _algorithm3_desired(self, r_max: float, snapshot, state: Optional[ControllerState] = None) -> int:
         """Algorithm 3: Compute k_m = ceil(r_max * s_m / (μ_m * ρ_m)).
 
         Maps the envelope rate to a required replica count accounting for
         conditional invocation probability (s_m) and the planner's capacity buffer (ρ_m).
         """
-        mu_m = max(1e-9, self._capacity_rps)
+        stage = getattr(snapshot, "stage", "CloudRefine")
+        mu_m = self._resolve_capacity(stage, state)
         rho_m = max(1e-9, float(self.rho_m))
         s_m = max(0.0, float(self.invocation_prob))
         k = math.ceil(r_max * s_m / (mu_m * rho_m))
         return max(snapshot.min_workers, min(snapshot.max_workers, max(int(self.min_replicas), k)))
 
-    def _algorithm4_desired(self, stage: str, snapshot) -> int:
+    def _algorithm4_desired(self, stage: str, snapshot, state: Optional[ControllerState] = None) -> int:
         """Algorithm 4: Compute k_m from λ_new = max over last 30s of 5s-bucket rates.
 
         λ_new is the peak 5-second arrival rate observed in the past 30 seconds.
@@ -272,7 +283,7 @@ class InferLineExactController(_PlacementReplanMixin):
         lam_new = self._lambda_5s_buf[stage].window_max(
             self.scaledown_window_epochs // self.bucket_size_epochs
         )
-        mu_m = max(1e-9, self._capacity_rps)
+        mu_m = self._resolve_capacity(stage, state)
         s_m = max(0.0, float(self.invocation_prob))
         rho_p = self._rho_p
         k = math.ceil(lam_new * s_m / (mu_m * rho_p))
@@ -308,10 +319,10 @@ class InferLineExactController(_PlacementReplanMixin):
 
             # --- Algorithm 3: sliding-window max envelope → scale-up ---
             r_max = self._algorithm3_rmax(stage)
-            desired_up = self._algorithm3_desired(r_max, snapshot)
+            desired_up = self._algorithm3_desired(r_max, snapshot, state=state)
 
             # --- Algorithm 4: 30s rolling max → scale-down candidate ---
-            desired_down = self._algorithm4_desired(stage, snapshot)
+            desired_down = self._algorithm4_desired(stage, snapshot, state=state)
 
             # Determine final desired and action
             action_taken = "none"

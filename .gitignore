@@ -33,14 +33,8 @@ data/tinyimagenet/val/
 !data/azure_traces/azure_functions_2019_processed.npz
 
 # ── Experiment Outputs & Runtime Logs ──────────────────────────────────────────
-output/*
-!output/evolved_policy.py
-!output/evolved_policy_v2.py
-!output/evolved_policy_v3.py
-!output/evolved_policy_v6.py
-!output/evolution_runs/
-output/evolution_runs/*
-!output/evolution_runs/*.csv
+output/
+!output/*.py
 profiling/output*/
 calibration/output/
 runs/
@@ -50,6 +44,19 @@ logs/
 evolution.log*
 scratch/test_*/
 scratch/preflight_tmp/
+
+
+
+# ── LaTeX Compilation Artifacts ───────────────────────────────────────────────
+*.aux
+*.bbl
+*.blg
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
 
 # ── Cloned Frameworks & External Repositories ───────────────────────────────────
 clones/

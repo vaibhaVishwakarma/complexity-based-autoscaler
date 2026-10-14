@@ -583,7 +583,7 @@ A comprehensive audit of ContinuumBench documentation and source code confirms t
 - **Controller Extensibility (`controllers/README.md:48-53`)**: Explicitly endorses custom controllers via `extensions_local.py` / `src/continuum_ext/` without altering core benchmark code.
 
 ### 12.3 Empirical Findings from Step 8.5 Sensitivity Sweep
-The complete 120-run sensitivity sweep across the 10-point initialization ladder ($0.5\text{s} \to 300\text{s}$) revealed the exact physical operational boundaries of all controllers (documented in [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md)):
+The complete 120-run sensitivity sweep across the 10-point initialization ladder ($0.5\text{s} \to 300\text{s}$) revealed the exact physical operational boundaries of all controllers (documented in [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/auto-edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md)):
 1. **Diurnal Production Resilience (`suite3_azure`)**:
    Evolved Conformal v3 maintained **strict zero deadline misses across the entire ladder up to $T_{\text{init}} = 300.0\text{s}$ (5 minutes)** with P99 latency $\le 9.0\text{s}$, while saving $>57\%$ cost vs. HPA and cutting flapping by $>80\%$ vs. InferLine. In contrast, HPA and KEDA collapsed at $T_{\text{init}} \ge 15.0\text{s}$ (>1,700 misses).
 2. **Poisson Burst Containment (`suite1_spike`)**:
@@ -644,8 +644,8 @@ To maintain methodological rigor, execution proceeds through the updated 11-step
 | [x] | **5** | **Authoritative Baseline Runs** | Run baselines (Fixed, HPA, KEDA, InferLine) across all 13 regimes | `output/suite_baselines_runs/` | ✅ **PASS** |
 | [x] | **6** | **OpenEvolve Evaluator** | Cascade evaluator with Cost-Supreme objective ($J_{v3}$) | `src/continuum_ext/evolution/openevolve_evaluator_v3.py` | ✅ **PASS** |
 | [x] | **7** | **Evolutionary Synthesis** | Synthesized Global Champion `bbd9b1c2` (57.44% savings, 0 misses, 228 deltas) | `output/evolved_policy_v3.py` | ✅ **PASS** |
-| [x] | **8** | **Multi-Seed Statistical Validation** | Evaluated 20 held-out seeds (`1042-1061`) $\times$ 13 regimes $\times$ 5 controllers ($1,300$ runs). Certified zero misses ($p < 10^{-35}$), 51.51% cost savings ($p < 10^{-14}$), 76.7% churn reduction ($p < 10^{-43}$) vs InferLine | [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md) | ✅ **PASS** |
-| [x] | **8.5** | **Physical Realism & Scale-Gap Sweep** | Executed smooth delay ladder ($0.5\text{s} \to 300\text{s}$) across 120 runs; mapped $T_{\text{init}}^*$ tipping points | [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md) | ✅ **PASS** |
+| [x] | **8** | **Multi-Seed Statistical Validation** | Evaluated 20 held-out seeds (`1042-1061`) $\times$ 13 regimes $\times$ 5 controllers ($1,300$ runs). Certified zero misses ($p < 10^{-35}$), 51.51% cost savings ($p < 10^{-14}$), 76.7% churn reduction ($p < 10^{-43}$) vs InferLine | [`docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md`](file:///home/vaibo/auto-edgecompute/docs/STEP8_V3_MULTISEED_STATISTICAL_VALIDATION_REPORT.md) | ✅ **PASS** |
+| [x] | **8.5** | **Physical Realism & Scale-Gap Sweep** | Executed smooth delay ladder ($0.5\text{s} \to 300\text{s}$) across 120 runs; mapped $T_{\text{init}}^*$ tipping points | [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/auto-edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md) | ✅ **PASS** |
 | [ ] | **8.6** | **Realism-Aware Evolutionary Synthesis (v5)** | Run OpenEvolve v5 with dual-tier fitness $J_{v5}$ across canonical suites + delayed shock regimes ($15\text{s} \to 300\text{s}$) | `output/evolved_policy_v5.py` | 🟡 **ACTIVE** |
 | [ ] | **9** | **Final Multi-Seed Validation & Plots** | Execute 20-seed evaluation on Champion v5 across canonical + delayed suites; generate publication plots | `output/plots/` & paper figures | 🚀 **READY** |
 | [ ] | **10** | **Manuscript Writing & Review** | Draft full paper targeting USENIX ATC / ACM SoCC / EuroSys | `manuscript/` & referee reports | ⏳ **PENDING** |
@@ -660,7 +660,7 @@ To maintain methodological rigor, execution proceeds through the updated 11-step
   - 120 full simulations executed across the 10-point ladder ($0.5\text{s} \to 300.0\text{s}$) and stress triad.
   - Certified zero misses on production Azure traces up to 300s ($T_{\text{init}}^* > 300\text{s}$).
   - Mapped empirical tipping point on `suite2_shock` under long initialization delays.
-  - Published comprehensive empirical report in [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md).
+  - Published comprehensive empirical report in [`docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md`](file:///home/vaibo/auto-edgecompute/docs/STEP8_5_PHYSICAL_REALISM_AND_SCALE_GAP_SENSITIVITY_REPORT.md).
 
 ### Active Execution Phase: Step 8.6 (Realism-Aware Evolutionary Synthesis v5)
 - [ ] Implement dual-tier Evaluator v5 (`src/continuum_ext/evolution/openevolve_evaluator_v5.py`) with canonical floor gate and extreme delay shock evaluation ($T_{\text{init}} \in [15\text{s}, 50\text{s}, 150\text{s}, 250\text{s}, 300\text{s}]$).

@@ -143,10 +143,10 @@ Below is the definitive cross-benchmark matrix comparing all evaluated controlle
 ## 4. Final Conclusion & Manuscript Recommendations
 
 1. **Production Champion Promoted**:
-   [`output/champion_policy_v7_smooth.py`](/home/vaibo/edgecompute/output/champion_policy_v7_smooth.py) (and synced to [`output/evolved_policy_v7.py`](/home/vaibo/edgecompute/output/evolved_policy_v7.py)) is the authoritative production autoscaler.
+   [`output/champion_policy_v7_smooth.py`](/home/vaibo/auto-edgecompute/output/champion_policy_v7_smooth.py) (and synced to [`output/evolved_policy_v7.py`](/home/vaibo/auto-edgecompute/output/evolved_policy_v7.py)) is the authoritative production autoscaler.
 2. **Definitive Paper Claim**:
    > *"While state-of-the-art reactive autoscalers (Kubernetes HPA, KEDA) experience catastrophic queue abandonment (>24,000 requests unserved, P99 > 68s) once physical container startup delays ($T_{\text{boot}} \ge 15\text{s}$) are introduced, our evolved causal conformal policy maintains zero deadline misses across real-world diurnal Azure traces up to 5-minute boot latencies ($T_{\text{boot}} = 300\text{s}$), contains semantic shock misses by an order of magnitude, and slashes cloud compute by 56.4% while reducing actuation flapping by 11.1%."*
 3. **Artifact Availability**:
-   - Promoted Champion Policy: [`output/champion_policy_v7_smooth.py`](/home/vaibo/edgecompute/output/champion_policy_v7_smooth.py)
-   - Ladder Simulation Manifest: [`output/eval_v7_champion_smooth/summary_v7_vs_baselines.csv`](/home/vaibo/edgecompute/output/eval_v7_champion_smooth/summary_v7_vs_baselines.csv)
-   - Step 8.7 Evaluation Report: [`output/eval_v7_champion_smooth/EVALUATION_REPORT_V7.md`](/home/vaibo/edgecompute/output/eval_v7_champion_smooth/EVALUATION_REPORT_V7.md)
+   - Promoted Champion Policy: [`output/champion_policy_v7_smooth.py`](/home/vaibo/auto-edgecompute/output/champion_policy_v7_smooth.py)
+   - Ladder Simulation Manifest: [`output/eval_v7_champion_smooth/summary_v7_vs_baselines.csv`](/home/vaibo/auto-edgecompute/output/eval_v7_champion_smooth/summary_v7_vs_baselines.csv)
+   - Step 8.7 Evaluation Report: [`output/eval_v7_champion_smooth/EVALUATION_REPORT_V7.md`](/home/vaibo/auto-edgecompute/output/eval_v7_champion_smooth/EVALUATION_REPORT_V7.md)
