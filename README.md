@@ -11,6 +11,37 @@
 
 ---
 
+## 🎬 Video Explainer (1m 49s with Neural Narration)
+
+> **Watch the full walkthrough** covering the complexity blindness paradox, mathematical conformal triage, dual-horizon preemption, and the boot delay benchmark:
+
+<div align="center">
+  <video src="assets/cgda_explainer.mp4" controls width="100%" poster="assets/video_stills/04_dynamic_trajectories.png">
+    <a href="assets/cgda_explainer.mp4">
+      <img src="assets/video_stills/04_dynamic_trajectories.png" alt="CGDA Video Explainer (Click to Watch)" width="100%"/>
+    </a>
+  </video>
+  <p>
+    <em>▶ <strong><a href="assets/cgda_explainer.mp4">Click to Watch / Download Full HD 1080p60 Video Explainer (1m 49s with Voiceover)</a></strong></em>
+  </p>
+</div>
+
+<details>
+<summary><b>🎞️ Click to view scene breakdown & keyframes (6 scenes)</b></summary>
+
+| Scene | Keyframe | Topic Covered |
+| :--- | :---: | :--- |
+| **1. Paradox** | <a href="assets/video_stills/01_complexity_blindness.png"><img src="assets/video_stills/01_complexity_blindness.png" width="300" alt="Complexity Blindness"/></a> | **Complexity Blindness**: Flat ingress $\lambda(t)=100$ QPS while semantic drift triples cloud offload to 85 QPS. |
+| **2. Triage** | <a href="assets/video_stills/02_conformal_triage.png"><img src="assets/video_stills/02_conformal_triage.png" width="300" alt="Conformal Triage"/></a> | **Conformal Triage**: RAPS $|C(x)|=1 \implies$ **97.66% selective top-1 accuracy** resolved locally at edge. |
+| **3. Derivative** | <a href="assets/video_stills/03_telemetry_derivative.png"><img src="assets/video_stills/03_telemetry_derivative.png" width="300" alt="Telemetry Derivative"/></a> | **Telemetry Derivative**: $\Delta p(t) < -\theta_{\text{shock}}$ alerts cloud before queue backlog accumulates. |
+| **4. Trajectory** | <a href="assets/video_stills/04_dynamic_trajectories.png"><img src="assets/video_stills/04_dynamic_trajectories.png" width="300" alt="Dynamic Trajectories"/></a> | **Dynamic Trajectories**: Preemptive boot completes ahead of deadline ($5.8\text{ s} \ll 15.0\text{ s}$ SLO; 0 misses). |
+| **5. Benchmark** | <a href="assets/video_stills/05_boot_delay_ladder.png"><img src="assets/video_stills/05_boot_delay_ladder.png" width="300" alt="Boot Delay Ladder"/></a> | **Boot Delay Ladder**: 0 misses up to 10s; 83.3% miss reduction at 20s; 38.9% reduction at 50s. |
+| **6. Portability** | <a href="assets/video_stills/06_universal_portability.png"><img src="assets/video_stills/06_universal_portability.png" width="300" alt="Universal Portability"/></a> | **Universal Portability**: Dimensionless telemetry transferred to SLM $\to$ LLM and Edge $\to$ Cloud VLM cascades. |
+
+</details>
+
+---
+
 ## Overview: The "Complexity Blindness" Problem
 
 Modern edge-cloud machine learning pipelines serve inference requests through cascaded architectures: a lightweight triage model running at an edge gateway (e.g., EfficientNet-B0) resolves simple queries locally, offloading ambiguous, high-complexity requests to heavy GPU models in the cloud (e.g., ResNet-152).
