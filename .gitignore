@@ -23,6 +23,7 @@ models/*.onnx.data
 *.pt
 *.bin
 *.tar.gz
+*.tar.xz
 !models/.gitkeep
 !bundles/*.tar.gz
 
@@ -76,4 +77,9 @@ clones/
 /references/papers/
 /figures/
 /analysis/
-/papers/
+/paper/
+/figures-reformating/
+/word-doc/
+/scratch/
+/.agents/teamwork
+

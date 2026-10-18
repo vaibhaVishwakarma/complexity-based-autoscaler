@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Reproduction-Pipeline">
+    <mxGraphModel dx="850" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="680">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Outer Canvas Box -->
+        <mxCell id="box_outer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#b0bec5;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="25" y="15" width="800" height="645" as="geometry" />
+        </mxCell>
+
+        <!-- Pipeline Header Title -->
+        <mxCell id="title_main" value="&lt;b style=&quot;font-size:12px;color:#1a237e;letter-spacing:0.8px;&quot;&gt;CONTINUUMBENCH &amp;amp; CGDA: PHASED REPRODUCTION PIPELINE&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="35" y="24" width="780" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle_main" value="&lt;span style=&quot;font-size:8px;color:#546e7a;&quot;&gt;Automated end-to-end verification from raw datasets to statistical manifests and publication artifacts&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="35" y="44" width="780" height="16" as="geometry" />
+        </mxCell>
+
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <!-- PHASE 0: SETUP & CRYPTOGRAPHIC DATASET AUDIT                    -->
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <mxCell id="card_p0" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="50" y="70" width="750" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="badge_p0" value="&lt;b style=&quot;font-size:8.5px;color:#ffffff;&quot;&gt;PHASE 0&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1976d2;strokeColor=none;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="62" y="80" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p0_title" value="&lt;b style=&quot;font-size:9.5px;color:#0d47a1;&quot;&gt;Environment Setup &amp;amp; Cryptographic Dataset Audit&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="79" width="360" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p0_body" value="&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;color:#37474f;line-height:1.3;&quot;&gt;&amp;bull; &lt;b&gt;CLI Command:&lt;/b&gt; &lt;code style=&quot;color:#0d47a1;background:#ffffff;padding:1px 3px;&quot;&gt;./.venv/bin/python -m scripts.verify_dataset_integrity&lt;/code&gt;&lt;br/&gt;&amp;bull; &lt;b&gt;Audit Targets:&lt;/b&gt; Microsoft Azure Functions 2019 trace (SHA-256: &lt;code&gt;9aeabacb...&lt;/code&gt;, 276M requests) &amp;amp; Tiny ImageNet-C (10,000 valid frames).&lt;br/&gt;&amp;bull; &lt;b&gt;Expected Artifact:&lt;/b&gt; Certification pass of volume conservation law (0.000% error) and 14-day duration invariant.&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="98" width="655" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Down Arrow: P0 -> P1 -->
+        <mxCell id="arr_0_1" value="" style="endArrow=classic;html=1;strokeColor=#1976d2;strokeWidth=1.8;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="425" y="142" as="sourcePoint" />
+            <mxPoint x="425" y="160" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <!-- PHASE 1: CONFORMAL CALIBRATION & HARDWARE SERVICE CONSTANTS      -->
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <mxCell id="card_p1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#388e3c;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="50" y="160" width="750" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="badge_p1" value="&lt;b style=&quot;font-size:8.5px;color:#ffffff;&quot;&gt;PHASE 1&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#388e3c;strokeColor=none;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="62" y="170" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p1_title" value="&lt;b style=&quot;font-size:9.5px;color:#1b5e20;&quot;&gt;Conformal Calibration &amp;amp; Hardware Service Profiling&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="169" width="360" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p1_body" value="&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;color:#37474f;line-height:1.3;&quot;&gt;&amp;bull; &lt;b&gt;Config Artifact:&lt;/b&gt; &lt;code style=&quot;color:#1b5e20;background:#ffffff;padding:1px 3px;&quot;&gt;configs/calibration_config.json&lt;/code&gt;&lt;br/&gt;&amp;bull; &lt;b&gt;Calibrated Parameters:&lt;/b&gt; RAPS quantile &lt;b&gt;q&#770; = 0.79914&lt;/b&gt; (&amp;alpha; = 0.10, empirical test coverage = 96.63%, |C| = 7.25).&lt;br/&gt;&amp;bull; &lt;b&gt;Hardware Service Rate:&lt;/b&gt; Profiling on Tesla T4 GPU yields &lt;b&gt;&amp;mu; = 16.0 RPS/worker&lt;/b&gt; (fixed identically across all controllers).&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="188" width="655" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Down Arrow: P1 -> P2 -->
+        <mxCell id="arr_1_2" value="" style="endArrow=classic;html=1;strokeColor=#388e3c;strokeWidth=1.8;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="425" y="232" as="sourcePoint" />
+            <mxPoint x="425" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <!-- PHASE 2: CANONICAL BASELINE SIMULATION BENCHMARK                -->
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <mxCell id="card_p2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#ffa000;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="50" y="250" width="750" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="badge_p2" value="&lt;b style=&quot;font-size:8.5px;color:#ffffff;&quot;&gt;PHASE 2&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffa000;strokeColor=none;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="62" y="260" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p2_title" value="&lt;b style=&quot;font-size:9.5px;color:#e65100;&quot;&gt;Canonical Baseline Simulation Benchmark (13 Regimes &amp;times; 5 Controllers)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="259" width="450" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p2_body" value="&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;color:#37474f;line-height:1.3;&quot;&gt;&amp;bull; &lt;b&gt;CLI Command:&lt;/b&gt; &lt;code style=&quot;color:#e65100;background:#ffffff;padding:1px 3px;&quot;&gt;./.venv/bin/python -m scripts.run_suite_baselines&lt;/code&gt;&lt;br/&gt;&amp;bull; &lt;b&gt;Benchmarked Controllers:&lt;/b&gt; CGDA (Proposed), Predictive Traffic-Envelope (InferLine), Static Peak (k=18), Reactive CPU (HPA), Reactive Queue (KEDA).&lt;br/&gt;&amp;bull; &lt;b&gt;Expected Output:&lt;/b&gt; 65 simulation runs across Suites 1, 2, and 3 archived in &lt;code&gt;output/suite_baselines_runs/&lt;/code&gt;.&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="278" width="655" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Down Arrow: P2 -> P3 -->
+        <mxCell id="arr_2_3" value="" style="endArrow=classic;html=1;strokeColor=#ffa000;strokeWidth=1.8;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="425" y="322" as="sourcePoint" />
+            <mxPoint x="425" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <!-- PHASE 3: MULTI-SEED STATISTICAL VALIDATION CAMPAIGN             -->
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <mxCell id="card_p3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ede7f6;strokeColor=#673ab7;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="50" y="340" width="750" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="badge_p3" value="&lt;b style=&quot;font-size:8.5px;color:#ffffff;&quot;&gt;PHASE 3&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#673ab7;strokeColor=none;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="62" y="350" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p3_title" value="&lt;b style=&quot;font-size:9.5px;color:#311b92;&quot;&gt;Multi-Seed Statistical Validation (260 Matched Pairs per Controller)&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="349" width="450" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p3_body" value="&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;color:#37474f;line-height:1.3;&quot;&gt;&amp;bull; &lt;b&gt;CLI Commands:&lt;/b&gt; &lt;code style=&quot;color:#311b92;background:#ffffff;padding:1px 3px;&quot;&gt;./.venv/bin/python -m scripts.run_step8_multiseed_v7 --seeds 20&lt;/code&gt; &amp;rarr; &lt;code style=&quot;color:#311b92;background:#ffffff;padding:1px 3px;&quot;&gt;process_step8_v7_statistics&lt;/code&gt;&lt;br/&gt;&amp;bull; &lt;b&gt;Hypothesis Tests:&lt;/b&gt; Two-sided paired Wilcoxon signed-rank tests across n=260 paired observations per baseline.&lt;br/&gt;&amp;bull; &lt;b&gt;Expected Metrics:&lt;/b&gt; 0.00 misses for CGDA, 67.38% cost savings vs Peak (p=2.07e-44), 35.0% lower P99 vs Predictive (p=5.46e-43).&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="368" width="655" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Down Arrow: P3 -> P4 -->
+        <mxCell id="arr_3_4" value="" style="endArrow=classic;html=1;strokeColor=#673ab7;strokeWidth=1.8;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="425" y="412" as="sourcePoint" />
+            <mxPoint x="425" y="430" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <!-- PHASE 4: PHYSICAL BOOT DELAY LADDER SENSITIVITY SWEEP           -->
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <mxCell id="card_p4" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fbe9e7;strokeColor=#d84315;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="50" y="430" width="750" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="badge_p4" value="&lt;b style=&quot;font-size:8.5px;color:#ffffff;&quot;&gt;PHASE 4&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d84315;strokeColor=none;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="62" y="440" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p4_title" value="&lt;b style=&quot;font-size:9.5px;color:#bf360c;&quot;&gt;Physical Boot Delay Ladder Sensitivity Sweep &amp;amp; Tipping Point Analysis&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="439" width="480" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p4_body" value="&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;color:#37474f;line-height:1.3;&quot;&gt;&amp;bull; &lt;b&gt;CLI Command:&lt;/b&gt; &lt;code style=&quot;color:#bf360c;background:#ffffff;padding:1px 3px;&quot;&gt;./.venv/bin/python -m scripts.evaluate_v7_raw_results&lt;/code&gt;&lt;br/&gt;&amp;bull; &lt;b&gt;Delay Sweep Ladder:&lt;/b&gt; T&lt;sub&gt;boot&lt;/sub&gt; &amp;isin; {1, 5, 10, 20, 50, 100, 150, 200, 300}s across 19,750 requests (Spike, Shock &amp;amp; Azure).&lt;br/&gt;&amp;bull; &lt;b&gt;Empirical Discovery:&lt;/b&gt; Proves 0 misses for T&lt;sub&gt;boot&lt;/sub&gt; &amp;le; 10s (vs 631 for InferLine); reveals physical saturation horizon at T&lt;sub&gt;boot&lt;/sub&gt; &amp;ge; 100s.&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="458" width="655" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Down Arrow: P4 -> P5 -->
+        <mxCell id="arr_4_5" value="" style="endArrow=classic;html=1;strokeColor=#d84315;strokeWidth=1.8;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="425" y="502" as="sourcePoint" />
+            <mxPoint x="425" y="520" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <!-- PHASE 5: PUBLICATION TABLE & FIGURE GENERATION                  -->
+        <!-- ────────────────────────────────────────────────────────────── -->
+        <mxCell id="card_p5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#c2185b;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="50" y="520" width="750" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="badge_p5" value="&lt;b style=&quot;font-size:8.5px;color:#ffffff;&quot;&gt;PHASE 5&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#c2185b;strokeColor=none;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="62" y="530" width="60" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p5_title" value="&lt;b style=&quot;font-size:9.5px;color:#880e4f;&quot;&gt;Publication Table &amp;amp; High-DPI Figure Generation Suite&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="529" width="450" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="txt_p5_body" value="&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;color:#37474f;line-height:1.3;&quot;&gt;&amp;bull; &lt;b&gt;CLI Commands:&lt;/b&gt; &lt;code style=&quot;color:#880e4f;background:#ffffff;padding:1px 3px;&quot;&gt;./.venv/bin/python -m scripts.generate_paper_tables_v7&lt;/code&gt; &amp;amp; &lt;code style=&quot;color:#880e4f;background:#ffffff;padding:1px 3px;&quot;&gt;generate_paper_figures_v7&lt;/code&gt;&lt;br/&gt;&amp;bull; &lt;b&gt;Outputs in output/paper_data/:&lt;/b&gt; Table 1 (Calibration), Table 2 (1,300 Runs), Table 3 (Delay Ladder), Table 4 (Pareto Ablation).&lt;br/&gt;&amp;bull; &lt;b&gt;Outputs in figures/:&lt;/b&gt; Publication-grade 300+ DPI figures (Fig 2 Trajectories, Fig 3 Delay Ladder, Fig 4 Boxplots, Fig 5 Pareto).&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="130" y="548" width="655" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Final Certification Footer -->
+        <mxCell id="footer_cert" value="&lt;b style=&quot;font-size:8px;color:#2e7d32;&quot;&gt;&amp;#10003; All pipelines execute strictly via root module invocation (&lt;code&gt;./.venv/bin/python -m &amp;lt;module&amp;gt;&lt;/code&gt;) with zero hardcoding.&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="50" y="602" width="750" height="18" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

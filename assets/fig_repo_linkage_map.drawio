@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="Repo-Linkage-Map">
+    <mxGraphModel dx="1200" dy="700" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="680">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Title Banner -->
+        <mxCell id="top_banner" value="&lt;b style=&quot;font-size:14px;color:#1a237e;letter-spacing:0.5px;&quot;&gt;AUTONOMOUS SERVING CONTINUUM: REPOSITORY ARCHITECTURE &amp;amp; MODULE LINKAGE MAP&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:9px;color:#455a64;&quot;&gt;Bridging Upstream Runtimes, Local Extensions, Conformal Calibration, Benchmark Drivers, and Statistical Manifests&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8eaf6;strokeColor=#3f51b5;strokeWidth=1.5;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="20" y="15" width="1160" height="42" as="geometry" />
+        </mxCell>
+
+        <!-- ============================================================== -->
+        <!-- COLUMN 1: UPSTREAM FOUNDATION RUNTIMES & IMMUTABLE DATA         -->
+        <!-- ============================================================== -->
+        <mxCell id="col1_outer" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#455a64;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="20" y="68" width="340" height="595" as="geometry" />
+        </mxCell>
+        <mxCell id="col1_title" value="&lt;b style=&quot;color:#263238;font-size:11px;&quot;&gt;1. UPSTREAM RUNTIMES &amp;amp; IMMUTABLE DATA&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="30" y="74" width="320" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Box 1A: ContinuumBench -->
+        <mxCell id="c1_continuumbench" value="&lt;b style=&quot;font-size:10px;color:#0d47a1;&quot;&gt;clones/ContinuumBench/&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:8px;color:#1565c0;&quot;&gt;Edge-Cloud Continuum Simulator (Li et al., '24)&lt;/span&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; Multi-node distributed continuum topology&lt;br/&gt;&amp;bull; Heterogeneous edge-cloud network simulation&lt;br/&gt;&amp;bull; WAN latency, bandwidth, and stochastic loss models&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e3f2fd;strokeColor=#1976d2;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="35" y="100" width="310" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Box 1B: ECLYPSE -->
+        <mxCell id="c1_eclypse" value="&lt;b style=&quot;font-size:10px;color:#004d40;&quot;&gt;clones/eclypse/&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:8px;color:#00796b;&quot;&gt;Discrete-Event Graph Runtime (Massa et al., '24)&lt;/span&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; Event-driven execution graph and timeline clock&lt;br/&gt;&amp;bull; Work-conserving FIFO task queue disciplines&lt;br/&gt;&amp;bull; High-throughput asynchronous simulation harness&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e0f2f1;strokeColor=#00796b;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="35" y="198" width="310" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Box 1C: OpenEvolve -->
+        <mxCell id="c1_openevolve" value="&lt;b style=&quot;font-size:10px;color:#4a148c;&quot;&gt;clones/openevolve/&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:8px;color:#6a1b9a;&quot;&gt;LLM-Guided Evolutionary Synthesis Engine&lt;/span&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; LLM mutation operator &amp;amp; policy search loop&lt;br/&gt;&amp;bull; Multi-objective fitness: SLA misses + cost + flaps&lt;br/&gt;&amp;bull; Synthesizes verified O(1) Python scaling logic&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f3e5f5;strokeColor=#7b1fa2;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="35" y="296" width="310" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Box 1D: Data Single Source of Truth -->
+        <mxCell id="c1_data" value="&lt;b style=&quot;font-size:10px;color:#b71c1c;&quot;&gt;data/ (Immutable Single Source of Truth)&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.25;&quot;&gt;&amp;bull; &lt;b&gt;azure_traces/&lt;/b&gt;: Microsoft Azure Functions 2019&lt;br/&gt;&amp;nbsp;&amp;nbsp;&amp;bull; 14-day production trace (1,209,600s, 9.62 MB)&lt;br/&gt;&amp;nbsp;&amp;nbsp;&amp;bull; Exact 0.000% volume conservation error&lt;br/&gt;&amp;bull; &lt;b&gt;tinyimagenet/val/&lt;/b&gt;: 10,000 JPEG vision payloads&lt;br/&gt;&amp;bull; Automated downloader: &lt;i&gt;scripts/download_datasets.py&lt;/i&gt;&lt;br/&gt;&amp;bull; Integrity auditor: &lt;i&gt;scripts/verify_dataset_integrity.py&lt;/i&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffebee;strokeColor=#c62828;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="35" y="394" width="310" height="120" as="geometry" />
+        </mxCell>
+
+        <!-- Box 1E: Configs -->
+        <mxCell id="c1_configs" value="&lt;b style=&quot;font-size:10px;color:#e65100;&quot;&gt;configs/ (Zero Hardcoding Architecture)&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; &lt;b&gt;suites/&lt;/b&gt;: 16 scenario YAMLs (Suites 1, 2, 3 + macro)&lt;br/&gt;&amp;bull; &lt;b&gt;evolution/&lt;/b&gt;: OpenEvolve configuration YAMLs (v1..v7)&lt;br/&gt;&amp;bull; Standardized SLA deadline: &lt;b&gt;D&lt;sub&gt;SLA&lt;/sub&gt; = 15.0s&lt;/b&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff8e1;strokeColor=#f57f17;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="35" y="527" width="310" height="85" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================================== -->
+        <!-- COLUMN 2: CONTINUUM EXTENSION CORE (src/continuum_ext/)         -->
+        <!-- ============================================================== -->
+        <mxCell id="col2_outer" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#1565c0;strokeWidth=1.8;" vertex="1" parent="1">
+          <mxGeometry x="410" y="68" width="380" height="595" as="geometry" />
+        </mxCell>
+        <mxCell id="col2_title" value="&lt;b style=&quot;color:#0d47a1;font-size:11px;&quot;&gt;2. CONTINUUM EXTENSION CORE (src/continuum_ext/)&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="420" y="74" width="360" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Subcard 2A: contracts/ -->
+        <mxCell id="c2_contracts" value="&lt;b style=&quot;font-size:9.5px;color:#2e7d32;&quot;&gt;contracts/ (Pydantic Schema Validation Across Gates)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:7.5px;color:#388e3c;&quot;&gt;gate1.py (RAPS) &amp;bull; gate2.py (Triton Profiles) &amp;bull; baselines.py (Telemetry &amp;amp; Actions)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#4caf50;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="425" y="100" width="350" height="38" as="geometry" />
+        </mxCell>
+
+        <!-- Subcard 2B: src/continuum_ext modules -->
+        <mxCell id="c2_core_frame" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#9e9e9e;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="425" y="148" width="350" height="325" as="geometry" />
+        </mxCell>
+        <mxCell id="c2_core_badge" value="&lt;b style=&quot;color:#212121;font-size:9.5px;&quot;&gt;src/continuum_ext/ Subpackages&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="435" y="150" width="330" height="16" as="geometry" />
+        </mxCell>
+
+        <!-- Sub-box 1: Workload -->
+        <mxCell id="c2_workload" value="&lt;b style=&quot;font-size:9px;color:#0d47a1;&quot;&gt;workload/conformal_workloads.py&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:3px;line-height:1.2;&quot;&gt;&amp;bull; Decoupled arrival dynamics &amp;lambda;(t) + RAPS complexity collapse p&lt;sub&gt;fast&lt;/sub&gt;(t)&lt;br/&gt;&amp;bull; Generates 13 stress regimes (Suites 1, 2, 3) across 20 matched seeds&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#90caf9;" vertex="1" parent="1">
+          <mxGeometry x="435" y="170" width="330" height="48" as="geometry" />
+        </mxCell>
+
+        <!-- Sub-box 2: Realism -->
+        <mxCell id="c2_realism" value="&lt;b style=&quot;font-size:9px;color:#00796b;&quot;&gt;realism/dynamic_batching_model.py &amp;amp; network_batch_link.py&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:3px;line-height:1.2;&quot;&gt;&amp;bull; NVIDIA Tesla T4 Triton Server: dynamic batching b &amp;le; 32 w/ 40ms timeout&lt;br/&gt;&amp;bull; Micro-benchmarked physical capacity: &amp;mu; = 16.0 RPS/worker (T&lt;sub&gt;exec&lt;/sub&gt; = 62.5ms)&lt;br/&gt;&amp;bull; Controlled container boot delay ladder: T&lt;sub&gt;boot&lt;/sub&gt; &amp;isin; [1, 300]s&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#80cbc4;" vertex="1" parent="1">
+          <mxGeometry x="435" y="226" width="330" height="58" as="geometry" />
+        </mxCell>
+
+        <!-- Sub-box 3: Controllers -->
+        <mxCell id="c2_controllers" value="&lt;b style=&quot;font-size:9px;color:#c62828;&quot;&gt;controllers/conformal_controllers.py &amp;amp; inferline_*.py&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:3px;line-height:1.2;&quot;&gt;&amp;bull; &lt;b&gt;CGDA (Proposed)&lt;/b&gt;: Evolved dual-horizon controller w/ hyperbolic credit&lt;br/&gt;&amp;bull; &lt;b&gt;InferLine&lt;/b&gt;: Sliding-window traffic envelope &amp;amp; reactive tuning (ACM SoCC '20)&lt;br/&gt;&amp;bull; &lt;b&gt;Kubernetes HPA&lt;/b&gt; &amp;amp; &lt;b&gt;KEDA Scaler&lt;/b&gt;: Standard production baselines&lt;br/&gt;&amp;bull; &lt;b&gt;Fixed-Peak&lt;/b&gt;: Ceiling baseline (k = 18 workers, zero misses reference)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ef9a9a;" vertex="1" parent="1">
+          <mxGeometry x="435" y="292" width="330" height="74" as="geometry" />
+        </mxCell>
+
+        <!-- Sub-box 4: Evolution Champion -->
+        <mxCell id="c2_evolution" value="&lt;b style=&quot;font-size:9px;color:#4a148c;&quot;&gt;evolution/champion_policy_v7_smooth.py (Policy c614055a)&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:3px;line-height:1.2;&quot;&gt;&amp;bull; Fast loop: preempts triage collapse (&amp;Delta;p&lt;sub&gt;fast&lt;/sub&gt; &amp;lt; -0.15) before queue builds&lt;br/&gt;&amp;bull; Slow loop: re-anchors capacity k&lt;sup&gt;*&lt;/sup&gt; w/ 15s scale-down hysteresis cooldown&lt;br/&gt;&amp;bull; Hyperbolic booting credit discounts pending workers without flapping&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#ce93d8;" vertex="1" parent="1">
+          <mxGeometry x="435" y="374" width="330" height="66" as="geometry" />
+        </mxCell>
+
+        <!-- Subcard 2C: Grounding & Profiling Foundations -->
+        <mxCell id="c2_grounding" value="&lt;b style=&quot;font-size:9.5px;color:#37474f;&quot;&gt;Statistical Foundations &amp;amp; Hardware Profiling&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:3px;line-height:1.2;&quot;&gt;&amp;bull; &lt;b&gt;calibration/&lt;/b&gt;: RAPS non-conformity calibration (&amp;alpha;=0.10, q&#770;=0.79914)&lt;br/&gt;&amp;bull; &lt;b&gt;profiling/&lt;/b&gt;: AWS c7i CPU (10.7ms) + Tesla T4 GPU benchmarks&lt;br/&gt;&amp;bull; Spearman rank validation: &lt;b&gt;r&lt;sub&gt;s&lt;/sub&gt;(|C(x)|, T&lt;sub&gt;infer&lt;/sub&gt;) = 0.821 (p &amp;lt; 10&lt;sup&gt;-15&lt;/sup&gt;)&lt;/b&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#eceff1;strokeColor=#90a4ae;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="425" y="485" width="350" height="62" as="geometry" />
+        </mxCell>
+
+        <!-- Subcard 2D: Models -->
+        <mxCell id="c2_models" value="&lt;b style=&quot;font-size:9.5px;color:#455a64;&quot;&gt;models/ (Exported ONNX Models)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:7.5px;color:#607d8b;&quot;&gt;efficientnet_b0_tiny.onnx (Edge triage) &amp;bull; gate6_resnet152.onnx (Cloud teacher)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b0bec5;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="425" y="556" width="350" height="34" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================================== -->
+        <!-- COLUMN 3: BENCHMARK EXECUTION, OUTPUTS & ARTIFACTS              -->
+        <!-- ============================================================== -->
+        <mxCell id="col3_outer" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fafafa;strokeColor=#2e7d32;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="840" y="68" width="340" height="595" as="geometry" />
+        </mxCell>
+        <mxCell id="col3_title" value="&lt;b style=&quot;color:#1b5e20;font-size:11px;&quot;&gt;3. BENCHMARKS, MANIFESTS &amp;amp; PLOTS&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="850" y="74" width="320" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Box 3A: Benchmark Driver -->
+        <mxCell id="c3_driver" value="&lt;b style=&quot;font-size:10px;color:#1b5e20;&quot;&gt;scripts/run_step8_multiseed_v7.py&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:8px;color:#2e7d32;&quot;&gt;Primary Multi-Seed Benchmark Driver&lt;/span&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; Dispatches 5 controllers across 13 evaluation suites&lt;br/&gt;&amp;bull; Sweeps 20 matched random arrival seeds (1,300 runs)&lt;br/&gt;&amp;bull; Audits firm real-time SLA deadline: D&lt;sub&gt;SLA&lt;/sub&gt; = 15.0s&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e8f5e9;strokeColor=#43a047;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="855" y="100" width="310" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Box 3B: Output Manifests -->
+        <mxCell id="c3_output" value="&lt;b style=&quot;font-size:10px;color:#e65100;&quot;&gt;output/step8_v7_multiseed_runs/&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:8px;color:#f57f17;&quot;&gt;Authoritative 1,300-Run Benchmark Manifests&lt;/span&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; &lt;b&gt;step8_v7_statistical_manifest.json&lt;/b&gt;: p-values &amp;amp; metrics&lt;br/&gt;&amp;bull; &lt;b&gt;step8_v7_summary.csv&lt;/b&gt;: per-seed cost, misses, flaps&lt;br/&gt;&amp;bull; &lt;b&gt;raw_runs/*.json&lt;/b&gt;: 1,300 epoch-by-epoch telemetry traces&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fffde7;strokeColor=#fbc02d;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="855" y="198" width="310" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Box 3C: Statistical Analysis -->
+        <mxCell id="c3_stats" value="&lt;b style=&quot;font-size:10px;color:#0d47a1;&quot;&gt;scripts/process_step8_v7_statistics.py&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size:8px;color:#1976d2;&quot;&gt;Hypothesis Testing &amp;amp; Effect Size Calculator&lt;/span&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; Paired Wilcoxon signed-rank test (&lt;b&gt;p &amp;lt; 10&lt;sup&gt;-5&lt;/sup&gt;&lt;/b&gt;)&lt;br/&gt;&amp;bull; Standardized effect size (&lt;b&gt;Cohen's d &amp;gt; 1.2&lt;/b&gt;, large effect)&lt;br/&gt;&amp;bull; Certifies 100% SLA compliance (0.00 misses vs 0.61)&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1f5fe;strokeColor=#03a9f4;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="855" y="296" width="310" height="85" as="geometry" />
+        </mxCell>
+
+        <!-- Box 3D: Publication Plots in assets/ -->
+        <mxCell id="c3_assets" value="&lt;b style=&quot;font-size:10px;color:#880e4f;&quot;&gt;assets/ (Reproduced Benchmark Visualizations)&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.25;&quot;&gt;&amp;bull; &lt;b&gt;fig_testbed_continuum.png&lt;/b&gt;: 3-tier continuum testbed&lt;br/&gt;&amp;bull; &lt;b&gt;fig2_dynamic_trajectories.png&lt;/b&gt;: tracking under collapse&lt;br/&gt;&amp;bull; &lt;b&gt;fig3_realism_delay_ladder_curves.png&lt;/b&gt;: T_boot sweep&lt;br/&gt;&amp;bull; &lt;b&gt;fig4_actuation_flapping_boxplots.png&lt;/b&gt;: cost &amp;amp; flaps&lt;br/&gt;&amp;bull; &lt;b&gt;fig5_cost_latency_pareto.png&lt;/b&gt;: Pareto optimality&lt;br/&gt;&amp;bull; &lt;b&gt;fig6_regimes_matrix.png&lt;/b&gt;: 13-regime compute matrix&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fce4ec;strokeColor=#e91e63;strokeWidth=1.2;" vertex="1" parent="1">
+          <mxGeometry x="855" y="394" width="310" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- Box 3E: Reproduction Protocol -->
+        <mxCell id="c3_reproduce" value="&lt;b style=&quot;font-size:10px;color:#212121;&quot;&gt;REPRODUCE.md (Step-by-Step Execution Guide)&lt;/b&gt;&lt;br/&gt;&lt;div align=&quot;left&quot; style=&quot;font-size:7.5px;padding-left:4px;line-height:1.2;&quot;&gt;&amp;bull; Phase 0: Environment preflight &amp;amp; dataset integrity check&lt;br/&gt;&amp;bull; Phases 1&amp;ndash;3: Calibration, hardware profiling &amp;amp; control logic&lt;br/&gt;&amp;bull; Phases 4&amp;ndash;6: 1,300-run benchmark, hypothesis tests, plots&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#424242;strokeWidth=1.3;" vertex="1" parent="1">
+          <mxGeometry x="855" y="520" width="310" height="75" as="geometry" />
+        </mxCell>
+
+
+        <!-- ============================================================== -->
+        <!-- CONNECTING FLOW ARROWS BETWEEN COLUMNS                          -->
+        <!-- ============================================================== -->
+        <!-- Arrow: Upstream -> Extension Core -->
+        <mxCell id="flow_col1_col2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#1565c0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="col1_outer" target="col2_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_flow_1_2" value="&lt;span style=&quot;font-size:8px;color:#0d47a1;background-color:#ffffff;padding:2px;&quot;&gt;&lt;b&gt;Subclass &amp;amp; Extend&lt;/b&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="358" y="355" width="45" height="18" as="geometry" />
+        </mxCell>
+
+        <!-- Arrow: Extension Core -> Benchmarks & Outputs -->
+        <mxCell id="flow_col2_col3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2e7d32;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="col2_outer" target="col3_outer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl_flow_2_3" value="&lt;span style=&quot;font-size:8px;color:#1b5e20;background-color:#ffffff;padding:2px;&quot;&gt;&lt;b&gt;Benchmark &amp;amp; Log&lt;/b&gt;&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="788" y="355" width="50" height="18" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
