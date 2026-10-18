@@ -40,10 +40,10 @@ $$
 s_i = \sum_{j=1}^{o_i} \hat{\pi}_j(x_i) + \lambda_{\text{reg}}\!\left(o_i - k_{\text{reg}}\right)^{+} \quad (k_{\text{reg}} = 5, \; \lambda_{\text{reg}} = 0.01)
 $$
 
-The calibration threshold is the $(1-\alpha)$ quantile over calibration set $\mathcal{D}_{\text{cal}}$ ($|\mathcal{D}_{\text{cal}}| = 5{,}000$ validation images):
+The calibration threshold $\hat{q}$ is the $(1-\alpha)$ quantile evaluated over the calibration set $\mathcal{D}_{\mathrm{cal}}$ ($n = 5{,}000$ validation images):
 
 $$
-\hat{q} = \operatorname{Quantile}_{1-\alpha}^{+}\!\left(\{s_i\}_{i=1}^{n}\right) = 0.79914
+\hat{q} = \mathrm{Quantile}_{1-\alpha}^{+}\left(\{s_i\}_{i=1}^{n}\right) = 0.79914
 $$
 
 Evaluated on the 4,100 held-out test split, empirical coverage is **96.63%**, satisfying the nominal 90% guarantee, with $50.0\%$ fast-path edge acceptance ($|C(x)| = 1$) and $2.34\%$ selective classification error.
