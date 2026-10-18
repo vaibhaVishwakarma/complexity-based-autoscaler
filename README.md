@@ -4,6 +4,7 @@
 [![Research Project](https://img.shields.io/badge/status-research%20project%20%7C%20publication%20underway-orange.svg)](#project-status)
 [![Benchmark: ContinuumBench](https://img.shields.io/badge/benchmark-ContinuumBench-emerald.svg)](#testbed-architecture)
 [![Reproducibility: Certified](https://img.shields.io/badge/reproducibility-certified%20(260%20matched%20runs)-green.svg)](REPRODUCE.md)
+[![Video Explainer: 1m49s (with Voiceover)](https://img.shields.io/badge/video-1m49s%20explainer%20(voiceover)-purple.svg)](assets/cgda_explainer.mp4)
 
 > **Research Project & Manuscript Underway**  
 > *Feed-forward complexity telemetry for heterogeneous serving cascades in the edge-cloud continuum.*

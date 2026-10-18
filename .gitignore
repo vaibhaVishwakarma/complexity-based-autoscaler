@@ -39,6 +39,7 @@ output/
 profiling/output*/
 calibration/output/
 runs/
+media/
 logs/
 *.log
 *.log.*
