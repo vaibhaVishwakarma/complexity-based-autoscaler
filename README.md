@@ -16,13 +16,11 @@
 > **Watch the full walkthrough** covering the complexity blindness paradox, mathematical conformal triage, dual-horizon preemption, and the boot delay benchmark:
 
 <div align="center">
-  <video src="assets/cgda_explainer.mp4" controls width="100%" poster="assets/video_stills/04_dynamic_trajectories.png">
-    <a href="assets/cgda_explainer.mp4">
-      <img src="assets/video_stills/04_dynamic_trajectories.png" alt="CGDA Video Explainer (Click to Watch)" width="100%"/>
-    </a>
-  </video>
+  <a href="assets/cgda_explainer.mp4">
+    <img src="assets/cgda_explainer_preview.gif" alt="CGDA Video Explainer Animated Preview (Click to Watch 1080p Video with Audio)" width="920"/>
+  </a>
   <p>
-    <em>▶ <strong><a href="assets/cgda_explainer.mp4">Click to Watch / Download Full HD 1080p60 Video Explainer (1m 49s with Voiceover)</a></strong></em>
+    <em>▶ <strong><a href="assets/cgda_explainer.mp4">Watch Full HD 1080p60 Video with Jenny's Neural Voiceover (1m 49s)</a></strong> &bull; Click animation to open full video with audio</em>
   </p>
 </div>
 
