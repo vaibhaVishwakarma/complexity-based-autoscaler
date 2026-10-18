@@ -9,65 +9,117 @@ This document provides a complete, step-by-step reproduction manual for the **Co
 
 ## 1. System Model & Mathematical Formulations
 
-The testbed models an edge-cloud split-inference cascade where requests are triaged at an edge gateway (EfficientNet-B0) and offloaded to an elastic cloud GPU cluster (ResNet-152 on NVIDIA Tesla T4 GPUs) under container startup lag $T_{\text{boot}} \in [1, 300]$\,s and an SLA deadline budget $D_{\text{SLA}} = 15.0$\,s.
+The testbed models an edge-cloud split-inference cascade where requests are triaged at an edge gateway (EfficientNet-B0) and offloaded to an elastic cloud GPU cluster (ResNet-152 on NVIDIA Tesla T4 GPUs) under container startup lag $T_{\text{boot}} \in [1, 300]\text{ s}$ and an SLA deadline budget $D_{\text{SLA}} = 15.0\text{ s}$.
 
 ![Conformal Split-Inference Triage Flow](assets/fig_conformal_triage_flow.png)
 
 ### 1.1 Knowledge Distillation & Edge Triage Synthesis
 To meet strict edge-serverless resource quotas (profiled under a 150 mCPU Linux cgroups container limit on an AWS c7i host), the edge triage model is synthesized from a heavy cloud teacher via **Knowledge Distillation (KD)**:
-- **Teacher Model**: Pretrained ResNet-152 ($11.56\text{B}$ FLOPs, frozen ImageNet weights).
-- **Student Model**: EfficientNet-B0 ($390\text{M}$ FLOPs, $5.3\text{M}$ parameters) fine-tuned on Tiny ImageNet-C ($K = 182$ classes), yielding a **$29.6\times$ FLOP reduction**.
+- **Teacher Model**: Pretrained ResNet-152 ($11.56\text{ B}$ FLOPs, frozen ImageNet weights).
+- **Student Model**: EfficientNet-B0 ($390\text{ M}$ FLOPs, $5.3\text{ M}$ parameters) fine-tuned on Tiny ImageNet-C ($K = 182$ classes), yielding a **$29.6\times$ FLOP reduction**.
 - **Distillation Loss**: Combined cross-entropy and Kullback-Leibler (KL) divergence over softened teacher probabilities:
-  $$\mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}}, y) \;+\; \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\!\left(\sigma\!\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\!\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)$$
+
+  $$
+  \mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}}, y) + \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\left(\sigma\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)
+  $$
+
   with distillation weight $\alpha_{\text{KD}} = 0.70$ and distillation temperature $T_{\text{KD}} = 4.0$ trained over 20 epochs.
 - **Temperature Constraint**: Logit temperature scaling $T = 1.0 \ge 1.0$ is enforced (ECE-minimizing; artificial sharpening $T < 1.0$ is strictly prohibited) before split-conformal calibration.
 - **ONNX Export**: Baked with dynamic batching into `models/efficientnet_b0_tiny.onnx` (opset 18).
 
 ### 1.2 Split-Conformal Prediction Guarantee
 Conformal prediction guarantees distribution-free marginal coverage for any model $f$:
-$$\mathbb{P}\!\left(Y \in C(X)\right) \;\ge\; 1 - \alpha$$
+
+$$
+\mathbb{P}\left(Y \in C(X)\right) \ge 1 - \alpha
+$$
+
 For miscoverage level $\alpha = 0.10$, RAPS computes a regularized non-conformity score over sorted softmax probabilities $\hat{\pi}_j(x_i)$:
-$$s_i = \sum_{j=1}^{o_i} \hat{\pi}_j(x_i) + \lambda_{\text{reg}}\!\left(o_i - k_{\text{reg}}\right)^{+} \quad (k_{\text{reg}} = 5, \; \lambda_{\text{reg}} = 0.01)$$
+
+$$
+s_i = \sum_{j=1}^{o_i} \hat{\pi}_j(x_i) + \lambda_{\text{reg}}\!\left(o_i - k_{\text{reg}}\right)^{+} \quad (k_{\text{reg}} = 5, \; \lambda_{\text{reg}} = 0.01)
+$$
+
 The calibration threshold is the $(1-\alpha)$ quantile over calibration set $\mathcal{D}_{\text{cal}}$ ($|\mathcal{D}_{\text{cal}}| = 5{,}000$ validation images):
-$$\hat{q} = \operatorname{Quantile}_{1-\alpha}^{+}\!\left(\{s_i\}_{i=1}^{n}\right) = 0.79914$$
+
+$$
+\hat{q} = \operatorname{Quantile}_{1-\alpha}^{+}\!\left(\{s_i\}_{i=1}^{n}\right) = 0.79914
+$$
+
 Evaluated on the 4,100 held-out test split, empirical coverage is **96.63%**, satisfying the nominal 90% guarantee, with $50.0\%$ fast-path edge acceptance ($|C(x)| = 1$) and $2.34\%$ selective classification error.
 
 ### 1.3 Feed-Forward Complexity Telemetry
-At each epoch ($\Delta t = 5.0$\,s), the edge gateway measures local triage acceptance:
-$$p_{\text{fast}}(t) = \frac{N_{\text{local}}(t)}{N_{\text{total}}(t)} \in [0, 1]$$
-- Singleton $|C(x)| = 1 \implies$ query resolved locally at edge sink.
-- Ambiguous $|C(x)| \ge 2 \implies$ query forwarded over WAN to cloud queue.
+At each epoch ($\Delta t = 5.0\text{ s}$), the edge gateway measures local triage acceptance:
+
+$$
+p_{\text{fast}}(t) = \frac{N_{\text{local}}(t)}{N_{\text{total}}(t)} \in [0, 1]
+$$
+
+- **Singleton** $|C(x)| = 1 \implies$ query resolved locally at edge sink.
+- **Ambiguous** $|C(x)| \ge 2 \implies$ query forwarded over WAN to cloud queue.
 
 The effective cloud offload arrival rate directed to the GPU cluster is:
-$$\lambda_{\text{cloud}}(t) = \left(1 - p_{\text{fast}}(t)\right) \cdot \lambda(t)$$
+
+$$
+\lambda_{\text{cloud}}(t) = \left(1 - p_{\text{fast}}(t)\right) \cdot \lambda(t)
+$$
 
 ### 1.4 Hardware Capacity Constant $\mu$
-From dedicated hardware profiling on an NVIDIA Tesla T4 GPU executing NVIDIA Triton Inference Server (batch size $b=1$, mean service time $\bar{t} = 0.0625$\,s):
-$$\mu = \frac{1}{\bar{t}} = \frac{1}{0.0625} = 16.0 \text{ RPS/worker}$$
-The maximum pool ceiling is $k_{\max} = 18$ workers ($288$\,RPS peak capacity).
+From dedicated hardware profiling on an NVIDIA Tesla T4 GPU executing NVIDIA Triton Inference Server (batch size $b = 1$, mean service time $\bar{t} = 0.0625\text{ s}$):
+
+$$
+\mu = \frac{1}{\bar{t}} = \frac{1}{0.0625} = 16.0\text{ RPS/worker}
+$$
+
+The maximum pool ceiling is $k_{\max} = 18\text{ workers}$ ($288\text{ RPS}$ peak capacity).
 
 ### 1.5 Dual-Horizon Control Policy
-1. **Fast-Loop Complexity-Derivative Preemption (Sub-Second)**:
-   $$\Delta p(t) = p_{\text{fast}}(t) - p_{\text{fast}}(t-1)$$
-   When $\Delta p(t) < -\theta_{\text{shock}}$ and booting register $C_{\text{boot}}(t) = 0$:
-   $$\delta_{\text{pre}}(t) = \left\lceil \frac{\lambda(t) \cdot (1 - p_{\text{fast}}(t))}{\mu} \right\rceil - k(t), \quad C_{\text{boot}}(t) \mathrel{+}= \delta_{\text{pre}}(t)$$
-   A positive $\delta_{\text{pre}}$ immediately issues a scale-out command and locks $C_{\text{boot}}$, preventing runaway provisioning during transient shocks.
 
-2. **Slow-Loop Capacity Stabilization & Asymmetric Hysteresis (5.0s Epoch)**:
-   $$k^{*}(t) = \left\lceil \frac{\lambda_{\text{cloud}}(t) + \beta \cdot q(t)}{\mu} \right\rceil$$
-   - **Scale-Up**: If $k^*(t) > k(t)$ and $C_{\text{boot}}(t) = 0$, provision immediately: $\Delta k(t) = \min(k^*(t) - k(t), k_{\text{max\_up}})$.
-   - **Scale-Down**: If $k^*(t) < k(t)$ and $C_{\text{boot}}(t) = 0$, scale down only after cooldown $\tau_{\text{down}} \ge 15.0$\,s to prevent actuation flapping.
+#### 1. Fast-Loop Complexity-Derivative Preemption (Sub-Second Horizon)
+The fast loop computes the drift velocity of the local acceptance rate over sliding window $\Delta t = 5.0\text{ s}$:
+
+$$
+\Delta p(t) = p_{\text{fast}}(t) - p_{\text{fast}}(t - 1)
+$$
+
+When negative velocity indicates an imminent offload surge ($\Delta p(t) < -\theta_{\text{shock}}$) and the booting credit register is empty ($C_{\text{boot}}(t) = 0$), CGDA issues an immediate preemptive scale-out command:
+
+$$
+\delta_{\text{pre}}(t) = \left\lceil \frac{\lambda(t) \cdot (1 - p_{\text{fast}}(t))}{\mu} \right\rceil - k(t)
+$$
+
+$$
+C_{\text{boot}}(t) \leftarrow C_{\text{boot}}(t) + \delta_{\text{pre}}(t)
+$$
+
+A positive $\delta_{\text{pre}}(t) > 0$ dispatches worker allocation before requests cross the WAN link into the cloud queue, while locking $C_{\text{boot}}$ to prevent runaway over-provisioning during transient bursts.
+
+#### 2. Slow-Loop Capacity Stabilization & Asymmetric Hysteresis (5.0s Epoch)
+The slow loop stabilizes steady-state worker capacity based on sustained cloud arrival rate and real-time queue depth:
+
+$$
+k^{\star}(t) = \left\lceil \frac{\lambda_{\text{cloud}}(t) + \beta \cdot q(t)}{\mu} \right\rceil
+$$
+
+Actuation follows an asymmetric policy to eliminate scaling flapping:
+- **Scale-Up**: If $k^{\star}(t) > k(t)$ and $C_{\text{boot}}(t) = 0$, provision immediately:
+
+  $$
+  \Delta k(t) = \min\!\left(k^{\star}(t) - k(t),\, k_{\mathrm{max\_up}}\right)
+  $$
+
+- **Scale-Down**: If $k^{\star}(t) < k(t)$ and $C_{\text{boot}}(t) = 0$, scale down only after cooldown $\tau_{\text{down}} \ge 15.0\text{ s}$ to guarantee hysteresis stability.
 
 ### 1.6 Physical Tipping Point Theorem
-For any dynamic autoscaler under boot delay $T_{\text{boot}}$ and SLA deadline $D_{\text{SLA}} = 15.0$\,s:
+For any dynamic autoscaler under boot delay $T_{\text{boot}}$ and SLA deadline $D_{\text{SLA}} = 15.0\text{ s}$:
 - When $T_{\text{boot}} \le D_{\text{SLA}}$, feed-forward preemption guarantees zero deadline misses during complexity shocks.
-- When $T_{\text{boot}} \ge T_{\text{sim}} \approx 90$\,s, newly provisioned containers finish booting after requests expire, forcing all dynamic and static controllers into identical physical queue saturation.
+- When $T_{\text{boot}} \ge T_{\text{sim}} \approx 90\text{ s}$, newly provisioned containers finish booting after requests expire, forcing all dynamic and static controllers into identical physical queue saturation.
 
 ### 1.7 Architectural Portability & Generalization to LLM/VLM Cascades
 - **Model Agnostic**: CGDA operates solely on dimensionless stream telemetry ($p_{\text{fast}}(t), \Delta p(t)$). The edge student and cloud teacher can be swapped with MobileNet, ConvNeXt, or Vision Transformers without modifying the control loop.
 - **SLM $\to$ LLM / Edge VLM $\to$ Cloud VLM Cascades**: In foundation model serving, edge gateways host compact distilled models (e.g., Llama-3.2-1B, SmolVLM, Phi-3.5) while cloud clusters host large reasoning engines (Llama-3.3-70B, Qwen2-VL).
 - **Conformal Risk Control for Open-Ended Generation**: Conformal Risk Control (CRC) bounding semantic entropy replaces discrete classification sets, allowing prompts to be resolved locally when semantic dispersion is bounded.
-- **Mitigating Severe Cold Starts ($100\text{--}300$\,s)**: Because LLM container initialization takes $100\text{--}300$\,s (*ServerlessLLM*), reactive scaling is physically incapable of responding in time ($T_{\text{boot}} \gg D_{\text{SLA}}$); CGDA's feed-forward preemption provides the required head start before cloud queues overflow.
+- **Mitigating Severe Cold Starts ($100\text{--}300\text{ s}$)**: Because LLM container initialization takes $100\text{--}300\text{ s}$ (*ServerlessLLM*), reactive scaling is physically incapable of responding in time ($T_{\text{boot}} \gg D_{\text{SLA}}$); CGDA's feed-forward preemption provides the required head start before cloud queues overflow.
 
 ---
 
@@ -173,7 +225,7 @@ This trains for 20 epochs on Tiny ImageNet-C ($K=182$ classes), evaluates on the
 
 ### Phase 2: Execute Canonical Baseline Simulation Suite
 
-Evaluate all five controllers across the 13 benchmark regimes under nominal conditions ($T_{\text{boot}} = 1.0$\,s):
+Evaluate all five controllers across the 13 benchmark regimes under nominal conditions ($T_{\text{boot}} = 1.0\text{ s}$):
 
 ```bash
 ./.venv/bin/python -m scripts.run_suite_baselines
@@ -182,7 +234,7 @@ Evaluate all five controllers across the 13 benchmark regimes under nominal cond
 **What to Expect**:
 - Executes 65 simulations ($13\text{ regimes} \times 5\text{ controllers}$).
 - Stores high-resolution telemetry traces, queue backlogs, and scaling logs in `output/suite_baselines_runs/`.
-- Verifies that all baselines utilize identical service capacity $\mu = 16.0$\,RPS and $k_{\max} = 18$.
+- Verifies that all baselines utilize identical service capacity $\mu = 16.0\text{ RPS}$ and $k_{\max} = 18$.
 
 ---
 
@@ -233,7 +285,7 @@ STEP 8 v7 MULTI-SEED STATISTICAL REPORT (20 Seeds x 13 Regimes = 260 Matched Pai
 
 ### Phase 4: Physical Delay Ladder Sensitivity & Tipping Point Sweep
 
-Run the 9-point container startup delay ladder ($T_{\text{boot}} \in \{1, 5, 10, 20, 50, 100, 150, 200, 300\}$\,s) across 19,750 requests (Spike, Shock, and Azure diurnal regimes):
+Run the 9-point container startup delay ladder ($T_{\text{boot}} \in \{1, 5, 10, 20, 50, 100, 150, 200, 300\}\text{ s}$) across 19,750 requests (Spike, Shock, and Azure diurnal regimes):
 
 ```bash
 ./.venv/bin/python -m scripts.evaluate_v7_raw_results
@@ -286,7 +338,7 @@ Outputs generated in `figures/`:
 | Verification Gate | Command | Authoritative Artifact | Success Criteria |
 | :--- | :--- | :--- | :--- |
 | **Dataset Invariants** | `./.venv/bin/python -m scripts.verify_dataset_integrity` | `data/azure_traces/` | All SHA-256 and duration invariants pass |
-| **Calibration Parameters** | Check `configs/calibration_config.json` | `calibration/configs/` | $\hat{q} = 0.79914, \mu = 16.0$\,RPS |
+| **Calibration Parameters** | Check `configs/calibration_config.json` | `calibration/configs/` | $\hat{q} = 0.79914, \mu = 16.0\text{ RPS}$ |
 | **Multi-Seed Validation** | `./.venv/bin/python -m scripts.run_step8_multiseed_v7` | `output/step8_v7_multiseed_runs/` | 1,300 runs complete with zero crashes |
 | **Hypothesis Testing** | `./.venv/bin/python -m scripts.process_step8_v7_statistics` | `step8_v7_statistical_manifest.json` | $p < 10^{-40}$ cost savings vs Peak |
-| **Delay Ladder Sweep** | `./.venv/bin/python -m scripts.evaluate_v7_raw_results` | `output/paper_data/table3_delay_ladder.csv` | 0 misses at $T_{\text{boot}} \le 10$\,s; saturation at $100$\,s |
+| **Delay Ladder Sweep** | `./.venv/bin/python -m scripts.evaluate_v7_raw_results` | `output/paper_data/table3_delay_ladder.csv` | 0 misses at $T_{\text{boot}} \le 10\text{ s}$; saturation at $100\text{ s}$ |

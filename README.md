@@ -49,14 +49,14 @@ Existing production autoscalers—including reactive CPU-utilization rules (Kube
 ![Conformal Split-Inference Triage & Telemetry Flow](assets/fig_conformal_triage_flow.png)
 
 1. **Blindness to Semantic Drift**: Standard controllers observe only aggregate ingress request rate $\lambda(t)$ or cloud queue depth $q(t)$. When incoming workloads shift toward semantically difficult queries (adverse illumination, rare classes, distribution shifts), edge triage offloads a higher percentage of requests to the cloud, even while aggregate arrival rate $\lambda(t)$ remains flat.
-2. **The Container Cold-Start Race**: By the time cloud queue backpressure materializes, container startup delay $T_{\text{boot}}$ (which ranges from seconds for warm snapshots to $100\text{--}300$\,s for large models) already exceeds the remaining SLA deadline budget $D_{\text{SLA}}$. Reactive scaling commands arrive too late, causing severe tail-latency spikes and deadline misses.
+2. **The Container Cold-Start Race**: By the time cloud queue backpressure materializes, container startup delay $T_{\text{boot}}$ (which ranges from seconds for warm snapshots to $100\text{--}300\text{ s}$ for large models) already exceeds the remaining SLA deadline budget $D_{\text{SLA}}$. Reactive scaling commands arrive too late, causing severe tail-latency spikes and deadline misses.
 
 ### The CGDA Solution
 
 The **Conformal-Gated Dual-Horizon Autoscaler (CGDA)** eliminates complexity blindness by instrumenting **RAPS (Regularized Adaptive Prediction Sets)** conformal prediction set cardinality $|C(x)|$ as real-time, feed-forward complexity telemetry:
 
 - **Fast Inner Loop (Sub-Second / 5.0s Epoch)**: Computes local triage acceptance $p_{\text{fast}}(t)$ and drift velocity $\Delta p(t)$. When negative velocity indicates an imminent offload surge ($\Delta p(t) < -\theta_{\text{shock}}$), CGDA issues preemptive scale-out commands *before* cloud queue backlog accumulates.
-- **Slow Outer Loop (Capacity Stabilization)**: Anchors steady-state worker capacity $k^*(t) = \lceil (\lambda_{\text{slow}}(t) + \beta q(t))/\mu \rceil$ using asymmetric hysteresis and a hardware booting-credit register $C_{\text{boot}}(t)$ that prevents over-provisioning and scaling churn.
+- **Slow Outer Loop (Capacity Stabilization)**: Anchors steady-state worker capacity $k^{\star}(t) = \lceil (\lambda_{\text{slow}}(t) + \beta q(t))/\mu \rceil$ using asymmetric hysteresis and a hardware booting-credit register $C_{\text{boot}}(t)$ that prevents over-provisioning and scaling churn.
 
 ---
 
@@ -65,10 +65,14 @@ The **Conformal-Gated Dual-Horizon Autoscaler (CGDA)** eliminates complexity bli
 ### 1. ResNet-152 to EfficientNet-B0 Knowledge Distillation
 The edge triage gateway requires low-latency, deterministic execution within a tight compute budget (profiled under a strict $150\text{ mCPU}$ Linux cgroups quota). To achieve high teacher fidelity without the heavy computational burden of cloud models, we synthesize the edge model via **Knowledge Distillation (KD)**:
 
-- **Teacher Model**: Pretrained ResNet-152 ($11.56\text{B}$ FLOPs, frozen ImageNet weights).
-- **Student Model**: EfficientNet-B0 ($390\text{M}$ FLOPs, $5.3\text{M}$ parameters) fine-tuned on Tiny ImageNet-C ($K = 182$ aligned classes), achieving a **$29.6\times$ reduction in inference FLOPs**.
+- **Teacher Model**: Pretrained ResNet-152 ($11.56\text{ B}$ FLOPs, frozen ImageNet weights).
+- **Student Model**: EfficientNet-B0 ($390\text{ M}$ FLOPs, $5.3\text{ M}$ parameters) fine-tuned on Tiny ImageNet-C ($K = 182$ aligned classes), achieving a **$29.6\times$ reduction in inference FLOPs**.
 - **Distillation Objective**: Soft cross-entropy combined with Kullback-Leibler (KL) divergence over softened teacher probabilities:
-  $$\mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}}, y) \;+\; \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\!\left(\sigma\!\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\!\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)$$
+
+  $$
+  \mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}}, y) + \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\left(\sigma\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)
+  $$
+
   trained for 20 epochs with distillation weight $\alpha_{\text{KD}} = 0.70$ and distillation temperature $T_{\text{KD}} = 4.0$.
 - **Conformal Calibration & ONNX Deployment**: Calibrated via Regularized Adaptive Prediction Sets (RAPS; $k_{\text{reg}}=5$, $\lambda_{\text{reg}}=0.01$, $\alpha=0.10$) on $n = 5{,}000$ calibration frames, obtaining quantile threshold $\hat{q} = 0.79914$ and $96.63\%$ empirical coverage on held-out test data. The model is exported to ONNX format (`models/efficientnet_b0_tiny.onnx`) with dynamic batching, delivering sub-millisecond local triage at the edge.
 
@@ -86,8 +90,8 @@ The conformal triage and dual-horizon autoscaling paradigm generalizes directly 
 - **SLM $\to$ LLM Cascades**: Small Language Models (e.g., Llama-3.2-1B, Qwen-2.5-1.5B, Phi-3.5-mini distilled from 70B/405B teacher checkpoints) serve as local edge gates. High-certainty factual lookups and routine queries are answered locally at zero cloud GPU cost, offloading complex multi-step reasoning, mathematical proofs, and code synthesis to cloud GPU clusters (Llama-3.3-70B, DeepSeek-V3).
 - **Edge VLM $\to$ Cloud VLM Cascades**: Compact Vision-Language Models (e.g., SmolVLM, PaliGemma-3B, Moondream2) deployed on smart cameras or edge gateways resolve basic object descriptions and scene queries, offloading high-resolution document parsing, dense visual reasoning, or anomalous video frames to cloud VLMs (Qwen2-VL-72B, LLaVA-NeXT).
 - **Conformal Risk Control (CRC) for Generative Uncertainty**: For open-ended generation where discrete classification sets do not apply, Conformal Risk Control (Angelopoulos et al., 2024) and semantic entropy define distribution-free bounds on hallucination risk. Queries exceeding calibrated entropy thresholds trigger feed-forward cloud offloading.
-- **The $100\text{--}300$\,s Cold-Start Dilemma (*ServerlessLLM*)**:
-  State-of-the-art LLM weight restoration requires $100\text{--}300$\,s over PCIe/NVLink (Fu et al., *ServerlessLLM*, OSDI '24). When startup delay vastly exceeds SLA deadlines ($T_{\text{boot}} \gg D_{\text{SLA}}$), traditional reactive autoscalers suffer 100% deadline misses during traffic or complexity shocks. CGDA’s feed-forward derivative ($\Delta p(t)$) detects triage distribution shifts at the edge gateway and pre-empts GPU container initialization before requests back up in cloud queues.
+- **The $100\text{--}300\text{ s}$ Cold-Start Dilemma (*ServerlessLLM*)**:
+  State-of-the-art LLM weight restoration requires $100\text{--}300\text{ s}$ over PCIe/NVLink (Fu et al., *ServerlessLLM*, OSDI '24). When startup delay vastly exceeds SLA deadlines ($T_{\text{boot}} \gg D_{\text{SLA}}$), traditional reactive autoscalers suffer 100% deadline misses during traffic or complexity shocks. CGDA’s feed-forward derivative ($\Delta p(t)$) detects triage distribution shifts at the edge gateway and pre-empts GPU container initialization before requests back up in cloud queues.
 
 ---
 
@@ -107,7 +111,7 @@ The diagram below illustrates how simulation datasets, calibration manifests, Op
 
 ## Where Others Were at X, We Achieved Y
 
-We evaluate CGDA against four de-branded baseline controllers across 1,300 matched evaluation runs ($20\text{ seeds} \times 13\text{ regimes} = 260$ paired observations per controller), with identical worker capacity $\mu = 16.0$\,RPS and $k_{\max} = 18$:
+We evaluate CGDA against four de-branded baseline controllers across 1,300 matched evaluation runs ($20\text{ seeds} \times 13\text{ regimes} = 260$ paired observations per controller), with identical worker capacity $\mu = 16.0\text{ RPS}$ and $k_{\max} = 18$:
 
 | Controller Architecture | Operational Policy | SLA Misses / Run | Compute Cost (WS/Run) | Relative Cost Savings | Scaling Churn / Run | P99 Tail Latency | Mean Queue Wait |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -117,16 +121,16 @@ We evaluate CGDA against four de-branded baseline controllers across 1,300 match
 | **Reactive CPU-Utilization** (K8s HPA) | Utilization target $U=0.70$ | 15.46 $\pm$ 4.82 | 1825.3 $\pm$ 54.8 | 14.95% vs Peak | 52.8 $\pm$ 4.4 | 6.81 $\pm$ 0.39s | 42.0 ms |
 | **Reactive Queue-Backlog** (KEDA) | Backlog target $q=5$ | 20.58 $\pm$ 4.05 | 1049.5 $\pm$ 48.7 | 51.10% vs Peak | 124.4 $\pm$ 4.9 | 8.64 $\pm$ 0.24s | 124.2 ms |
 
-### Key Relative Findings in Nominal Settings ($T_{\text{boot}} = 1.0$\,s)
+### Key Relative Findings in Nominal Settings ($T_{\text{boot}} = 1.0\text{ s}$)
 - **Versus Static Peak Provisioning**: CGDA achieves the exact same zero-miss reliability ($0.00$ vs $0.00$ misses) while slashing compute cost by **67.38%** ($p = 2.07 \times 10^{-44}$, paired Wilcoxon signed-rank test).
 - **Versus Reactive Scalers (Kubernetes HPA & KEDA)**: Where CPU HPA incurred $15.5$ misses/run and KEDA incurred $20.6$ misses/run under sudden complexity shifts, CGDA incurred **$0.00$ misses**. Furthermore, CGDA reduced actuation flapping by **74.6%** vs CPU HPA and **89.2%** vs KEDA.
-- **Versus Predictive Traffic-Envelope (InferLine)**: InferLine is exceptionally cost-efficient, provisioning at steady-state bounds ($620.4$\,WS vs CGDA's $700.0$\,WS, a $+12.8\%$ cost premium for CGDA). In exchange for this preemption buffer, CGDA reduces P99 tail latency by **35.0%** ($5.10$\,s vs $7.84$\,s, $p = 5.46 \times 10^{-43}$) and eliminates transient deadline breaches under bursty arrivals ($0.00$ vs $0.61$ misses/run, $p = 0.025$).
+- **Versus Predictive Traffic-Envelope (InferLine)**: InferLine is exceptionally cost-efficient, provisioning at steady-state bounds ($620.4\text{ WS}$ vs CGDA's $700.0\text{ WS}$, a $+12.8\%$ cost premium for CGDA). In exchange for this preemption buffer, CGDA reduces P99 tail latency by **35.0%** ($5.10\text{ s}$ vs $7.84\text{ s}$, $p = 5.46 \times 10^{-43}$) and eliminates transient deadline breaches under bursty arrivals ($0.00$ vs $0.61$ misses/run, $p = 0.025$).
 
 ---
 
-## The Primary Spotlight: Boot Delay Ladder Benchmark ($T_{\text{boot}} \in [1, 300]$\,s)
+## The Primary Spotlight: Boot Delay Ladder Benchmark ($T_{\text{boot}} \in [1, 300]\text{ s}$)
 
-While nominal evaluations ($T_{\text{boot}} = 1.0$\,s) show competitive performance across dynamic scalers, the real differentiator emerges under **realistic container startup delays**:
+While nominal evaluations ($T_{\text{boot}} = 1.0\text{ s}$) show competitive performance across dynamic scalers, the real differentiator emerges under **realistic container startup delays**:
 
 ![Container Startup Delay Sensitivity Curves and Physical Tipping Point](assets/fig3_realism_delay_ladder_curves.png)
 
@@ -143,13 +147,13 @@ While nominal evaluations ($T_{\text{boot}} = 1.0$\,s) show competitive performa
 | **150.0 s – 300.0 s** | 2,176 *(saturates)* | 2,176 *(saturates)* | 8,126 | 8,126 | 2,176 *(saturates)* |
 
 ### Insights from the Boot Delay Ladder
-1. **Sub-Tipping-Point Preemption ($T_{\text{boot}} \le 10$\,s)**:
-   - At $T_{\text{boot}} = 5$\,s, InferLine begins experiencing deadline misses ($77$ misses), while CGDA maintains **0 misses**.
-   - At $T_{\text{boot}} = 10$\,s, InferLine suffers $631$ deadline misses and CPU HPA suffers $339$ misses. CGDA’s feed-forward complexity derivative triggers preemption early enough to maintain **0 misses**.
-2. **Super-Tipping-Point Backlog Mitigation ($T_{\text{boot}} = 20$\,s)**:
-   - When boot delay exceeds the SLA deadline ($T_{\text{boot}} = 20$\,s $> D_{\text{SLA}} = 15.0$\,s), no dynamic controller can prevent misses entirely. However, CGDA restricts deadline misses to **232**, reducing failures by **83.3%** compared to InferLine ($1,393$ misses) and reactive scalers ($1,246\text{--}1,261$ misses).
-3. **Physical Saturation Boundary ($T_{\text{boot}} \ge 100$\,s)**:
-   - When boot delay exceeds the simulation episode duration ($T_{\text{boot}} \ge T_{\text{sim}} \approx 90$\,s), all controllers—including Static Peak Provisioning—saturate identically at $2,176$ misses. This confirms that saturation is a physical horizon boundary rather than an algorithmic policy failure.
+1. **Sub-Tipping-Point Preemption ($T_{\text{boot}} \le 10\text{ s}$)**:
+   - At $T_{\text{boot}} = 5\text{ s}$, InferLine begins experiencing deadline misses ($77$ misses), while CGDA maintains **0 misses**.
+   - At $T_{\text{boot}} = 10\text{ s}$, InferLine suffers $631$ deadline misses and CPU HPA suffers $339$ misses. CGDA’s feed-forward complexity derivative triggers preemption early enough to maintain **0 misses**.
+2. **Super-Tipping-Point Backlog Mitigation ($T_{\text{boot}} = 20\text{ s}$)**:
+   - When boot delay exceeds the SLA deadline ($T_{\text{boot}} = 20\text{ s} > D_{\text{SLA}} = 15.0\text{ s}$), no dynamic controller can prevent misses entirely. However, CGDA restricts deadline misses to **232**, reducing failures by **83.3%** compared to InferLine ($1,393$ misses) and reactive scalers ($1{,}246\text{--}1{,}261\text{ misses}$).
+3. **Physical Saturation Boundary ($T_{\text{boot}} \ge 100\text{ s}$)**:
+   - When boot delay exceeds the simulation episode duration ($T_{\text{boot}} \ge T_{\text{sim}} \approx 90\text{ s}$), all controllers—including Static Peak Provisioning—saturate identically at $2,176$ misses. This confirms that saturation is a physical horizon boundary rather than an algorithmic policy failure.
 
 ---
 
@@ -170,10 +174,10 @@ No autoscaler is universally optimal for every deployment. Here is an explicit b
 ### Strengths & Advantages
 - **Early Preemptive Trigger**: Anticipates cloud queue surges using edge conformal set cardinality before backlog forms.
 - **Actuation Churn Elimination**: Booting-credit lock ($C_{\text{boot}}(t)$) and asymmetric hysteresis reduce scaling flapping by $74.6\%\text{--}89.2\%$.
-- **Robustness to Moderate Boot Delays**: Provides zero deadline misses up to $T_{\text{boot}} \le 10$\,s and mitigates backlog by $83.3\%$ at $T_{\text{boot}} = 20$\,s.
+- **Robustness to Moderate Boot Delays**: Provides zero deadline misses up to $T_{\text{boot}} \le 10\text{ s}$ and mitigates backlog by $83.3\%$ at $T_{\text{boot}} = 20\text{ s}$.
 
 ### Disadvantages & Cost Premium
-- **Compute Cost Premium**: CGDA pays a **$+12.8\%$ worker-second premium** ($700.0$ vs $620.4$\,WS) over InferLine. By holding a small preemption reserve, CGDA prioritizes strict SLA compliance over absolute minimum cost.
+- **Compute Cost Premium**: CGDA pays a **$+12.8\%$ worker-second premium** ($700.0\text{ WS}$ vs $620.4\text{ WS}$) over InferLine. By holding a small preemption reserve, CGDA prioritizes strict SLA compliance over absolute minimum cost.
 - **Edge Telemetry Dependency**: Requires an edge triage model capable of computing uncertainty/conformal sets (e.g., RAPS scores) and streaming telemetry ($p_{\text{fast}}(t)$) to the cloud controller.
 - **Physical Boundary Invariance**: Like all dynamic autoscalers, CGDA cannot overcome physics when $T_{\text{boot}} \gg D_{\text{SLA}}$; in such environments, warm worker pools or container acceleration are mandatory.
 
@@ -181,8 +185,8 @@ No autoscaler is universally optimal for every deployment. Here is an explicit b
 
 | Use-Case Scenario | Recommended Controller | Primary Rationale |
 | :--- | :---: | :--- |
-| **Edge-Cloud Split Inference with Strict SLAs** | **CGDA** | Preempts complexity shocks under container startup lags ($1\text{s} \le T_{\text{boot}} \le 15\text{s}$). |
-| **Cost-Dominant / Batch Inference** | **InferLine** | Minimizes worker-seconds ($620.4$\,WS) when occasional queue buffering is acceptable. |
+| **Edge-Cloud Split Inference with Strict SLAs** | **CGDA** | Preempts complexity shocks under container startup lags ($1\text{ s} \le T_{\text{boot}} \le 15\text{ s}$). |
+| **Cost-Dominant / Batch Inference** | **InferLine** | Minimizes worker-seconds ($620.4\text{ WS}$) when occasional queue buffering is acceptable. |
 | **Homogeneous Microservices (Zero Startup Lag)** | **Kubernetes HPA** | Simpler CPU/traffic rules suffice when container scale-up is instantaneous. |
 | **Bursty Event-Driven Background Jobs** | **KEDA** | Direct queue-backlog tracking is effective when tail latency is not critical. |
 
