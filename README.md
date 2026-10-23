@@ -67,13 +67,12 @@ The edge triage gateway requires low-latency, deterministic execution within a t
 
 - **Teacher Model**: Pretrained ResNet-152 ($11.56\text{ B}$ FLOPs, frozen ImageNet weights).
 - **Student Model**: EfficientNet-B0 ($390\text{ M}$ FLOPs, $5.3\text{ M}$ parameters) fine-tuned on Tiny ImageNet-C ($K = 182$ aligned classes), achieving a **$29.6\times$ reduction in inference FLOPs**.
-- **Distillation Objective**: Soft cross-entropy combined with Kullback-Leibler (KL) divergence over softened teacher probabilities:
+- **Distillation Objective**: Soft cross-entropy combined with Kullback-Leibler (KL) divergence over softened teacher probabilities ($\alpha_{\text{KD}} = 0.70$, $T_{\text{KD}} = 4.0$, trained for 20 epochs):
 
-  $$
-  \mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}}, y) + \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\left(\sigma\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)
-  $$
+$$
+\mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}},\, y) + \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\left(\sigma\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)
+$$
 
-  trained for 20 epochs with distillation weight $\alpha_{\text{KD}} = 0.70$ and distillation temperature $T_{\text{KD}} = 4.0$.
 - **Conformal Calibration & ONNX Deployment**: Calibrated via Regularized Adaptive Prediction Sets (RAPS; $k_{\text{reg}}=5$, $\lambda_{\text{reg}}=0.01$, $\alpha=0.10$) on $n = 5{,}000$ calibration frames, obtaining quantile threshold $\hat{q} = 0.79914$ and $96.63\%$ empirical coverage on held-out test data. The model is exported to ONNX format (`models/efficientnet_b0_tiny.onnx`) with dynamic batching, delivering sub-millisecond local triage at the edge.
 
 ### 2. Architectural Portability Across Diverse Backbones

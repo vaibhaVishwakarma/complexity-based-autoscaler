@@ -17,13 +17,12 @@ The testbed models an edge-cloud split-inference cascade where requests are tria
 To meet strict edge-serverless resource quotas (profiled under a 150 mCPU Linux cgroups container limit on an AWS c7i host), the edge triage model is synthesized from a heavy cloud teacher via **Knowledge Distillation (KD)**:
 - **Teacher Model**: Pretrained ResNet-152 ($11.56\text{ B}$ FLOPs, frozen ImageNet weights).
 - **Student Model**: EfficientNet-B0 ($390\text{ M}$ FLOPs, $5.3\text{ M}$ parameters) fine-tuned on Tiny ImageNet-C ($K = 182$ classes), yielding a **$29.6\times$ FLOP reduction**.
-- **Distillation Loss**: Combined cross-entropy and Kullback-Leibler (KL) divergence over softened teacher probabilities:
+- **Distillation Loss**: Combined cross-entropy and Kullback-Leibler (KL) divergence over softened teacher probabilities ($\alpha_{\text{KD}} = 0.70$, $T_{\text{KD}} = 4.0$, 20 epochs):
 
-  $$
-  \mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}}, y) + \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\left(\sigma\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)
-  $$
+$$
+\mathcal{L}_{\text{KD}} = (1 - \alpha_{\text{KD}})\,\mathcal{L}_{\text{CE}}(\hat{y}_{\text{student}},\, y) + \alpha_{\text{KD}}\,T_{\text{KD}}^2\,\mathcal{L}_{\text{KL}}\left(\sigma\left(\frac{z_{\text{student}}}{T_{\text{KD}}}\right),\, \sigma\left(\frac{z_{\text{teacher}}}{T_{\text{KD}}}\right)\right)
+$$
 
-  with distillation weight $\alpha_{\text{KD}} = 0.70$ and distillation temperature $T_{\text{KD}} = 4.0$ trained over 20 epochs.
 - **Temperature Constraint**: Logit temperature scaling $T = 1.0 \ge 1.0$ is enforced (ECE-minimizing; artificial sharpening $T < 1.0$ is strictly prohibited) before split-conformal calibration.
 - **ONNX Export**: Baked with dynamic batching into `models/efficientnet_b0_tiny.onnx` (opset 18).
 
@@ -104,9 +103,9 @@ $$
 Actuation follows an asymmetric policy to eliminate scaling flapping:
 - **Scale-Up**: If $k^{\star}(t) > k(t)$ and $C_{\text{boot}}(t) = 0$, provision immediately:
 
-  $$
-  \Delta k(t) = \min\!\left(k^{\star}(t) - k(t),\, k_{\mathrm{max\_up}}\right)
-  $$
+$$
+\Delta k(t) = \min\!\left(k^{\star}(t) - k(t),\, k_{\max}^{\text{step}}\right)
+$$
 
 - **Scale-Down**: If $k^{\star}(t) < k(t)$ and $C_{\text{boot}}(t) = 0$, scale down only after cooldown $\tau_{\text{down}} \ge 15.0\text{ s}$ to guarantee hysteresis stability.
 
